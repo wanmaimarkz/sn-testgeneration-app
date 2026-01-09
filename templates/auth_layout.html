@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome - AI Test Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="flex h-screen overflow-hidden">
+    <div class="hidden md:flex w-1/2 bg-linear-to-br from-purple-500 to-indigo-500  text-white flex-col justify-center items-center p-12 text-center">
+        <h1 class="text-7xl font-black mb-6 tracking-tighter">TITLE</h1>
+        <p class="text-2xl font-light mb-2">Easily create test cases and test scripts</p>
+        <p class="text-xl opacity-70 mb-12">customize and refine it all in one place</p>
+        
+        <div class="w-full max-w-sm space-y-4">
+            <div class="flex items-center gap-3 bg-white/10 backdrop-blur-md p-3 rounded-xl w-fit">
+                <div class="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center"><i class="fas fa-robot text-xs"></i></div>
+                <span class="text-sm">Hi, You can put feature if you want</span>
+            </div>
+            <div class="flex items-center gap-3 bg-blue-600 p-3 rounded-xl w-fit ml-auto">
+                <span class="text-sm">Can you Generate test case login UI?</span>
+                <div class="w-6 h-6 bg-blue-400 rounded-full flex items-center justify-center"><i class="fas fa-user text-[10px]"></i></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="w-full md:w-1/2 bg-white flex flex-col justify-center items-center p-8">
+        {% block auth_content %}{% endblock %}
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

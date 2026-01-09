@@ -1,0 +1,27 @@
+{% extends 'layout.html' %}
+{% block title %}Home - Dashboard{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-lg flex-1 p-10 overflow-y-auto">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-4">Welcome to AI Test System</h1>
+        <p class="text-gray-600 text-xl mb-12">เลือกเครื่องมือที่คุณต้องการเพื่อเริ่มสร้าง Test Artifacts ด้วย AI</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="group p-8 bg-white border-2 border-gray-100 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all">
+                <div class="text-blue-600 mb-4"><i class="fas fa-file-invoice text-4xl"></i></div>
+                <h2 class="text-2xl font-bold mb-3">Test Case Generator</h2>
+                <p class="text-gray-500 mb-6">สร้างแผนการทดสอบและ Scenario อย่างละเอียด</p>
+                <a href="{{ url_for('new_chat', type='case') }}" class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700">เริ่มใช้งาน</a>
+            </div>
+
+            <div class="group p-8 bg-white border-2 border-gray-100 rounded-2xl hover:border-purple-500 hover:shadow-xl transition-all">
+                <div class="text-purple-600 mb-4"><i class="fas fa-terminal text-4xl"></i></div>
+                <h2 class="text-2xl font-bold mb-3">Test Script Generator</h2>
+                <p class="text-gray-500 mb-6">สร้าง Automation Code สำหรับ Selenium, Cypress และอื่นๆ</p>
+                <a href="{{ url_for('new_chat', type='script') }}" class="inline-block bg-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-purple-700">เริ่มใช้งาน</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

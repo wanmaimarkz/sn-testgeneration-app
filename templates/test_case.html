@@ -1,0 +1,145 @@
+{% extends 'layout.html' %}
+{% block title %}Test Case Generator{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-lg flex-1 flex flex-col overflow-hidden h-full">
+    <div class="p-6 border-b flex justify-between items-center bg-white">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Test Case Generator</h1>
+            <p class="text-sm text-gray-500">Session ID: {{ session.id }} | Model: Llama 3.2</p>
+        </div>
+        <span class="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
+            {{ session.generator_type.name | upper }}
+        </span>
+    </div>
+    
+    <div id="chat-window" class="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50">
+        {% if not session.messages %}
+            <div id="welcome-screen" class="flex flex-col items-center justify-center h-full text-center space-y-4">
+                <div class="bg-blue-500 text-white p-4 rounded-full shadow-lg">
+                    <i class="fas fa-robot text-3xl"></i>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-700">พร้อมช่วยสร้าง Test Case แล้ว!</h2>
+                <p class="text-gray-500 max-w-sm">ลองพิมพ์บอกรายละเอียดระบบที่คุณต้องการทดสอบ เช่น "เขียน Test Case สำหรับระบบ Login"</p>
+            </div>
+        {% else %}
+            {% for msg in session.messages %}
+                <div class="flex {{ 'justify-end' if msg.role.name == 'user' else 'justify-start' }}">
+                    <div class="max-w-[85%] rounded-2xl p-4 shadow-sm {{ 'bg-blue-600 text-white rounded-tr-none' if msg.role.name == 'user' else 'bg-white border text-gray-800 rounded-tl-none' }}">
+                        <div class="prose prose-sm max-w-none {{ 'text-white' if msg.role.name == 'user' else '' }}">
+                            {{ msg.content | safe }}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+        <div id="anchor"></div>
+    </div>
+
+    <div class="p-4 bg-white border-t">
+        <form id="chat-form" class="relative flex items-center space-x-2" onsubmit="event.preventDefault(); handleSend();">
+            <input type="text" id="user-input" 
+                   class="h-12 w-full p-4 bg-gray-100 border-none rounded-full pr-14 focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                   placeholder="พิมพ์รายละเอียดระบบที่นี่..."
+                   autocomplete="off">
+            <button type="submit" id="send-btn"
+                    class="absolute right-3 bg-blue-500 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors shadow-md">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const chatWindow = document.getElementById('chat-window');
+    const userInput = document.getElementById('user-input');
+    const welcomeScreen = document.getElementById('welcome-screen');
+
+    // ฟังก์ชันเลื่อนหน้าจอลงล่างสุด
+    function scrollToBottom() {
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    // เรียกใช้ตอนโหลดหน้าเพื่อดูประวัติเก่า
+    scrollToBottom();
+
+    async function handleSend() {
+        const message = userInput.value.trim();
+        if (!message) return;
+
+        // 1. ซ่อน Welcome Screen (ถ้ามี)
+        if (welcomeScreen) welcomeScreen.style.display = 'none';
+
+        // 2. แสดงข้อความ User บน UI ทันที
+        appendMessage('user', message);
+        userInput.value = '';
+        
+        // 3. แสดง Loading AI
+        const loadingId = appendMessage('assistant', '<i class="fas fa-ellipsis-h fa-beat"></i> กำลังคิด...');
+
+        try {
+            const response = await fetch('/send_message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: "{{ session.id }}",
+                    message: message
+                })
+            });
+
+            const data = await response.json();
+            
+            // 4. แทนที่ข้อความ Loading ด้วยคำตอบจริงจาก AI
+            updateMessage(loadingId, data.answer);
+        } catch (error) {
+            updateMessage(loadingId, "เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI กรุณาลองใหม่");
+            console.error("Error:", error);
+        }
+        scrollToBottom();
+    }
+
+    function appendMessage(role, text) {
+        const msgId = 'msg-' + Date.now();
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+        
+        msgDiv.innerHTML = `
+            <div id="${msgId}" class="max-w-[85%] rounded-2xl p-4 shadow-sm ${role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border text-gray-800 rounded-tl-none'}">
+                <div class="prose prose-sm max-w-none ${role === 'user' ? 'text-white' : ''}">
+                    ${text}
+                </div>
+            </div>
+        `;
+        chatWindow.appendChild(msgDiv);
+        scrollToBottom();
+        return msgId;
+    }
+
+    function updateMessage(id, text) {
+        const target = document.getElementById(id);
+        if (target) {
+            // ในที่นี้ถ้า AI ส่งตาราง Markdown มา คุณอาจต้องใช้ Library เช่น marked.js ช่วยเรนเดอร์
+            // แต่เบื้องต้นใช้ innerHTML สำหรับ Text ปกติก่อน
+            target.querySelector('.prose').innerHTML = text;
+        }
+    }
+</script>
+
+<style>
+    /* ปรับแต่งการแสดงผลตาราง Markdown ที่ได้จาก AI */
+    .prose table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+        font-size: 0.875rem;
+    }
+    .prose th, .prose td {
+        border: 1px solid #e5e7eb;
+        padding: 0.5rem;
+        text-align: left;
+    }
+    .prose th {
+        background-color: #f9fafb;
+    }
+</style>
+{% endblock %}

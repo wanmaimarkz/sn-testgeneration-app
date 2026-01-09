@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Test Generator{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 flex h-screen overflow-hidden">
+
+    {% include 'includes/_sidebar_left.html' %}
+
+    <main class="flex-1 flex flex-col bg-purple-700 relative p-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% if active_page == 'script' or active_page == 'case' %}
+        {% include 'includes/_sidebar_right.html' %}
+    {% endif %}
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

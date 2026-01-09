@@ -1,0 +1,82 @@
+{% extends 'auth_layout.html' %}
+
+{% block auth_content %}
+<div class="w-full max-w-sm">
+    <h2 class="text-4xl font-bold text-gray-800 mb-2 text-center">Sign In</h2>
+    <p class="text-gray-500 text-center mb-8 font-light italic">Welcome back! Please enter your details.</p>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div id="flash-container" class="fixed top-5 right-5 z-100 flex flex-col gap-3 min-w-72 max-w-md">
+                {% for category, message in messages %}
+                    <div class="flash-message shadow-2xl rounded-lg p-4 text-sm font-medium border transform transition-all duration-500 hover:scale-105
+                    {{ 'bg-red-100 text-red-700 border-red-200' if category == 'error' or category == 'message' else 'bg-green-100 text-green-700 border-green-200' }}">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center">
+                                <i class="fas {{ 'fa-exclamation-circle' if category == 'error' or category == 'message' else 'fa-check-circle' }} mr-3 text-lg"></i>
+                                <span>{{ message }}</span>
+                            </div>
+                            <button onclick="this.closest('.flash-message').remove()" class="ml-4 hover:opacity-50 transition-opacity">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <form action="/login" method="POST" class="space-y-5">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input type="email" name="email" required placeholder="Enter your email" 
+                   class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input type="password" id="login_password" name="password" required placeholder="Enter your password" 
+                   class="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition-all">
+        </div>
+        <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" id="togglePassword" class="rounded text-purple-600 cursor-pointer"> Show Password
+            </label>
+            <a href="#" class="text-sm text-blue-500 hover:underline">Forgot Password?</a>
+        </div>
+        <button type="submit" class="w-full bg-black text-white py-3 rounded-lg font-bold hover:bg-gray-800 transform active:scale-95 transition-all">
+            Sign In
+        </button>
+    </form>
+    
+    <p class="text-center text-sm text-gray-600 mt-8">
+        If you don't have account, You can create it. 
+        <a href="/signup" class="text-blue-500 font-bold hover:underline">Sign up</a>
+    </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const passwordInput = document.getElementById('login_password');
+    const toggleCheckbox = document.getElementById('togglePassword');
+
+    // ฟังก์ชัน Show/Hide Password
+    toggleCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            passwordInput.type = 'text';
+        } else {
+            passwordInput.type = 'password';
+        }
+    });
+
+    // ฟังก์ชันจัดการ Flash Messages ให้ค่อยๆ หายไปเอง
+    setTimeout(function() {
+        const alerts = document.querySelectorAll('.flash-message');
+        alerts.forEach(alert => {
+            alert.style.opacity = "0";
+            alert.style.transform = "translateX(50px)";
+            setTimeout(() => alert.remove(), 500);
+        });
+    }, 5000);
+</script>
+{% endblock %}

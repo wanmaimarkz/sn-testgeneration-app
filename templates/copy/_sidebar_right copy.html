@@ -1,0 +1,30 @@
+<aside class="w-72 bg-white border-l flex flex-col p-4 overflow-y-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-lg font-bold text-gray-800">Chat lists</h2>
+        <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"><i class="fas fa-user text-xs text-gray-500"></i></div>
+    </div>
+
+    <button class="w-full border-2 border-dashed border-blue-300 text-blue-500 p-2 rounded-lg mb-6 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
+        <i class="fas fa-folder-plus text-sm"></i> New Folder
+    </button>
+
+    <div class="space-y-2">
+        {% for i in range(5) %}
+        <div class="group flex items-center justify-between p-3 border rounded-xl hover:bg-gray-50 cursor-pointer transition-all">
+            <span class="flex items-center gap-3 text-sm text-gray-600">
+                <i class="far fa-folder text-blue-400"></i> Folder Name
+            </span>
+            <i class="fas fa-ellipsis-v text-gray-300 group-hover:text-gray-500"></i>
+        </div>
+        {% endfor %}
+        
+        {% for i in range(10) %}
+        <div class="group flex items-center justify-between p-3 border border-transparent rounded-xl hover:bg-gray-50 cursor-pointer transition-all">
+            <span class="flex items-center gap-3 text-sm text-gray-600">
+                <i class="far fa-comment text-gray-400"></i> Chat History {{ i+1 }}
+            </span>
+            <i class="fas fa-ellipsis-v text-gray-300 opacity-0 group-hover:opacity-100"></i>
+        </div>
+        {% endfor %}
+    </div>
+</aside>
