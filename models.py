@@ -24,7 +24,7 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
-    
+
     folders = db.relationship('Folder', backref='owner', lazy=True)
     sessions = db.relationship('ChatSession', backref='user', lazy=True)
 
@@ -45,6 +45,7 @@ class ChatSession(db.Model):
     folder_id = db.Column(db.Integer, db.ForeignKey('folders.id'), nullable=True)
     generator_type = db.Column(db.Enum(GenType), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     messages = db.relationship('Message', backref='session', lazy=True, cascade="all, delete-orphan")
 

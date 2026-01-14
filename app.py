@@ -3,6 +3,7 @@ from flask_login import LoginManager, login_user, login_required, logout_user, c
 from werkzeug.security import generate_password_hash, check_password_hash
 from ai_service import get_ai_response
 from models import db, User, Folder, ChatSession, Message, GenType, RoleType
+from datetime import datetime
 
 app = Flask(__name__)
 # Configuration
@@ -29,19 +30,22 @@ with app.app_context():
 @app.route('/')
 @login_required
 def index():
-    recent_chats = ChatSession.query.filter_by(user_id=current_user.id).order_by(ChatSession.created_at.desc()).limit(5).all()
-    return render_template('index.html', active_page='home', recent_chats=recent_chats)
+    # เรียงตาม updated_at เพื่อให้แชทล่าสุดอยู่บนสุด
+    sessions = ChatSession.query.filter_by(user_id=current_user.id).order_by(ChatSession.updated_at.desc()).all()
+    folders = Folder.query.filter_by(user_id=current_user.id).all()
+    return render_template('index.html', active_page='home', sessions=sessions, folders=folders)
 
-# แก้ไข: เปลี่ยนจาก redirect ไปเป็นการเปิด Template เปล่า (Session ยังไม่ถูกสร้างใน DB)
 @app.route('/test-case')
 @login_required
 def test_case():
-    return render_template('test_case.html', session=None, active_page='case')
+    sessions = ChatSession.query.filter_by(user_id=current_user.id).order_by(ChatSession.updated_at.desc()).all()
+    return render_template('test_case.html', session=None, active_page='case', sessions=sessions)
 
 @app.route('/test-script')
 @login_required
 def test_script():
-    return render_template('test_script.html', session=None, active_page='script')
+    sessions = ChatSession.query.filter_by(user_id=current_user.id).order_by(ChatSession.updated_at.desc()).all()
+    return render_template('test_script.html', session=None, active_page='script', sessions=sessions)
 
 
 # <--- Auth --->
@@ -122,7 +126,7 @@ def send_message():
         # 2. ตั้งค่า System Instruction
         system_instructions = ""
         if chat_session.generator_type == GenType.case:
-            system_instructions = "You are a QA Expert. Generate detailed Test Cases in Markdown Table format."
+            system_instructions = "You are a QA Expert. Generate detailed Test Cases Included TCID, Description in Markdown Table format."
         else:
             system_instructions = "You are a Senior Developer. Generate clean, executable Test Scripts (e.g., Robot Framework or Python)."
 
@@ -141,6 +145,7 @@ def send_message():
         # 6. บันทึกคำตอบ AI
         ai_msg = Message(session_id=session_id, role=RoleType.assistant, content=ai_content)
         db.session.add(ai_msg)
+        chat_session.updated_at = datetime.now()
         
         db.session.commit()
         
@@ -171,9 +176,11 @@ def view_chat(session_id):
     if chat_session.user_id != current_user.id:
         return redirect(url_for('index'))
     
+    # ดึงข้อมูล sessions ทั้งหมดส่งไปด้วยเพื่อให้ Sidebar อัปเดตลิสต์
+    sessions = ChatSession.query.filter_by(user_id=current_user.id).order_by(ChatSession.updated_at.desc()).all()
     active_page = chat_session.generator_type.name
     template = 'test_case.html' if active_page == 'case' else 'test_script.html'
-    return render_template(template, session=chat_session, active_page=active_page)
+    return render_template(template, session=chat_session, active_page=active_page, sessions=sessions)
 
 
 # <--- chat management --->
