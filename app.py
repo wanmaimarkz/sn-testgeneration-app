@@ -7,7 +7,7 @@ from models import db, User, Folder, ChatSession, Message, GenType, RoleType
 app = Flask(__name__)
 # Configuration
 app.config['SECRET_KEY'] = 'testgen_app_sn_2_2568'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:wanzaza123@localhost:5432/testgen-app'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:wanzaza123@localhost:5432/testgen-app' #your postgresql
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 
@@ -29,19 +29,19 @@ with app.app_context():
 @app.route('/')
 @login_required
 def index():
-    # ดึงแชทล่าสุด 5 รายการมาโชว์ที่หน้า Dashboard
     recent_chats = ChatSession.query.filter_by(user_id=current_user.id).order_by(ChatSession.created_at.desc()).limit(5).all()
     return render_template('index.html', active_page='home', recent_chats=recent_chats)
 
+# แก้ไข: เปลี่ยนจาก redirect ไปเป็นการเปิด Template เปล่า (Session ยังไม่ถูกสร้างใน DB)
 @app.route('/test-case')
 @login_required
 def test_case():
-    return redirect(url_for('new_chat', type='case'))
+    return render_template('test_case.html', session=None, active_page='case')
 
 @app.route('/test-script')
 @login_required
 def test_script():
-    return redirect(url_for('new_chat', type='script'))
+    return render_template('test_script.html', session=None, active_page='script')
 
 
 # <--- Auth --->
@@ -99,54 +99,61 @@ def logout():
 def send_message():
     try:
         data = request.json
-        session_id = data.get('session_id')
+        session_id = data.get('session_id') # รับค่า session_id (อาจเป็น null หรือ "null")
         user_content = data.get('message')
+        gen_type_str = data.get('type') # รับประเภทหน้า (case/script) จาก Frontend
         
-        chat_session = ChatSession.query.get_or_404(session_id)
-        if chat_session.user_id != current_user.id:
-            return jsonify({"status": "error", "message": "Unauthorized"}), 403
+        # 1. Logic การจัดการ Session (สร้างใหม่เฉพาะเมื่อไม่มี session_id)
+        if not session_id or session_id == "null":
+            g_type = GenType.case if gen_type_str == 'case' else GenType.script
+            chat_session = ChatSession(
+                user_id=current_user.id, 
+                generator_type=g_type,
+                title=user_content[:40] + ( '...' if len(user_content) > 40 else '' )
+            )
+            db.session.add(chat_session)
+            db.session.flush() # ดึง ID มาใช้โดยยังไม่ปิด Transaction
+            session_id = chat_session.id
+        else:
+            chat_session = ChatSession.query.get_or_404(session_id)
+            if chat_session.user_id != current_user.id:
+                return jsonify({"status": "error", "message": "Unauthorized"}), 403
 
+        # 2. ตั้งค่า System Instruction
         system_instructions = ""
         if chat_session.generator_type == GenType.case:
             system_instructions = "You are a QA Expert. Generate detailed Test Cases in Markdown Table format."
         else:
             system_instructions = "You are a Senior Developer. Generate clean, executable Test Scripts (e.g., Robot Framework or Python)."
 
-        # เตรียมประวัติการแชท + System Prompt
+        # 3. เตรียมประวัติการแชท (รวม System Prompt)
         history = [{"role": "system", "content": system_instructions}]
         for m in chat_session.messages:
             history.append({"role": m.role.name, "content": m.content})
         
-        # บันทึกข้อความของ User ลง DB
+        # 4. บันทึกข้อความ User
         user_msg = Message(session_id=session_id, role=RoleType.user, content=user_content)
         db.session.add(user_msg)
         
-        # เรียกใช้ AI Service
+        # 5. เรียก AI Service
         ai_content = get_ai_response(user_content, history)
         
-        # บันทึกคำตอบของ AI
+        # 6. บันทึกคำตอบ AI
         ai_msg = Message(session_id=session_id, role=RoleType.assistant, content=ai_content)
         db.session.add(ai_msg)
-        
-        if chat_session.title == "New Chat":
-            new_title = user_content[:40] + ( '...' if len(user_content) > 40 else '' )
-            chat_session.title = new_title
         
         db.session.commit()
         
         return jsonify({
             "status": "success",
+            "session_id": session_id, # ส่งกลับไปเพื่อให้ Frontend เก็บไว้ส่งในครั้งหน้า
             "answer": ai_content,
             "chat_title": chat_session.title
         })
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error: {str(e)}")
-        return jsonify({
-            "status": "error", 
-            "message": "AI Service is currently unavailable. Please check your Ollama connection."
-        }), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/new-chat/<type>')
 @login_required

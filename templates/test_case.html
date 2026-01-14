@@ -5,16 +5,20 @@
 <div class="bg-white rounded-xl shadow-lg flex-1 flex flex-col overflow-hidden h-full">
     <div class="p-6 border-b flex justify-between items-center bg-white">
         <div>
-            <h1 class="text-2xl font-bold text-gray-800">Test Case Generator</h1>
-            <p class="text-sm text-gray-500">Session ID: {{ session.id }} | Model: Llama 3.2</p>
+            <h1 id="chat-title" class="text-2xl font-bold text-gray-800">
+                {% if session %}{{ session.title }}{% else %}Test Case Generator{% endif %}
+            </h1>
+            <p class="text-sm text-gray-500">
+                Session ID: <span id="display-session-id">{{ session.id if session else 'New Session' }}</span> | Model: Llama 3.2
+            </p>
         </div>
         <span class="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-xs font-semibold">
-            {{ session.generator_type.name | upper }}
+            {{ active_page | upper }}
         </span>
     </div>
     
     <div id="chat-window" class="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50">
-        {% if not session.messages %}
+        {% if not session or not session.messages %}
             <div id="welcome-screen" class="flex flex-col items-center justify-center h-full text-center space-y-4">
                 <div class="bg-blue-500 text-white p-4 rounded-full shadow-lg">
                     <i class="fas fa-robot text-3xl"></i>
@@ -24,10 +28,10 @@
             </div>
         {% else %}
             {% for msg in session.messages %}
-                <div class="flex {{ 'justify-end' if msg.role.name == 'user' else 'justify-start' }}">
+                <div class="flex {{ 'justify-end' if msg.role.name == 'user' else 'justify-start' }} mb-4">
                     <div class="max-w-[85%] rounded-2xl p-4 shadow-sm {{ 'bg-blue-600 text-white rounded-tr-none' if msg.role.name == 'user' else 'bg-white border text-gray-800 rounded-tl-none' }}">
                         <div class="prose prose-sm max-w-none {{ 'text-white' if msg.role.name == 'user' else '' }}">
-                            {{ msg.content | safe }}
+                            {{ msg.content }}
                         </div>
                     </div>
                 </div>
@@ -50,95 +54,156 @@
     </div>
 </div>
 
+{% block scripts %}
 <script>
     const chatWindow = document.getElementById('chat-window');
     const userInput = document.getElementById('user-input');
     const welcomeScreen = document.getElementById('welcome-screen');
+    let currentSessionId = "{{ session.id if session else 'null' }}";
 
     // ฟังก์ชันเลื่อนหน้าจอลงล่างสุด
     function scrollToBottom() {
         chatWindow.scrollTop = chatWindow.scrollHeight;
     }
 
-    // เรียกใช้ตอนโหลดหน้าเพื่อดูประวัติเก่า
-    scrollToBottom();
+    // ฟังก์ชันสำหรับแปลง Markdown เป็น HTML (ตาราง)
+    function renderMarkdown(text) {
+        if (typeof marked !== 'undefined') {
+            // ปรับแต่ง marked ให้รองรับตาราง (gfm: true)
+            marked.setOptions({
+                gfm: true,
+                breaks: true
+            });
+            return marked.parse(text);
+        }
+        return text;
+    }
+
+    // --- จุดสำคัญ: จัดการข้อความเก่าเมื่อโหลดหน้าเว็บ ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // 1. ค้นหากล่องข้อความทั้งหมดที่มีคลาส .prose
+        const allProseMessages = document.querySelectorAll('.prose');
+        
+        allProseMessages.forEach(container => {
+            // 2. ดึงข้อความดิบออกมา (ใช้ textContent เพื่อป้องกันปัญหา HTML entities)
+            const rawContent = container.textContent.trim();
+            
+            // 3. แปลงเป็นตาราง Markdown แล้วแสดงผล
+            if (rawContent) {
+                container.innerHTML = renderMarkdown(rawContent);
+            }
+        });
+        
+        scrollToBottom();
+    });
 
     async function handleSend() {
         const message = userInput.value.trim();
         if (!message) return;
 
-        // 1. ซ่อน Welcome Screen (ถ้ามี)
         if (welcomeScreen) welcomeScreen.style.display = 'none';
 
-        // 2. แสดงข้อความ User บน UI ทันที
         appendMessage('user', message);
-        userInput.value = '';
-        
-        // 3. แสดง Loading AI
-        const loadingId = appendMessage('assistant', '<i class="fas fa-ellipsis-h fa-beat"></i> กำลังคิด...');
+        userInput.value = ''; 
+
+        // สร้างกล่อง Loading
+        const loadingId = appendMessage('assistant', '<i class="fas fa-ellipsis-h fa-beat"></i> Thinking...');
 
         try {
             const response = await fetch('/send_message', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    session_id: "{{ session.id }}",
-                    message: message
+                    session_id: currentSessionId,
+                    message: message,
+                    type: "{{ active_page }}"
                 })
             });
 
             const data = await response.json();
             
-            // 4. แทนที่ข้อความ Loading ด้วยคำตอบจริงจาก AI
-            updateMessage(loadingId, data.answer);
+            if (data.status === 'success') {
+                if (currentSessionId === 'null') {
+                    currentSessionId = data.session_id;
+                    document.getElementById('display-session-id').innerText = data.session_id;
+                    document.getElementById('chat-title').innerText = data.chat_title;
+                    window.history.pushState({}, '', `/chat/${data.session_id}`);
+                    
+                    // อัปเดต Sidebar ขวา (ถ้ามีฟังก์ชันนี้)
+                    if (window.appendNewChatToSidebar) {
+                        const now = new Date();
+                        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} · Today`;
+                        appendNewChatToSidebar(data.session_id, data.chat_title, timeStr);
+                    }
+                }
+                
+                // แทนที่ "กำลังคิด" ด้วยคำตอบจริง
+                updateMessage(loadingId, data.answer);
+            } else {
+                updateMessage(loadingId, "Error: " + data.message);
+            }
         } catch (error) {
-            updateMessage(loadingId, "เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI กรุณาลองใหม่");
-            console.error("Error:", error);
+            updateMessage(loadingId, "ขออภัย ไม่สามารถเชื่อมต่อกับ AI ได้ (ตรวจสอบ Ollama)");
         }
-        scrollToBottom();
     }
 
     function appendMessage(role, text) {
         const msgId = 'msg-' + Date.now();
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+        const rowDiv = document.createElement('div');
+        rowDiv.id = msgId;
+        rowDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4`;
         
-        msgDiv.innerHTML = `
-            <div id="${msgId}" class="max-w-[85%] rounded-2xl p-4 shadow-sm ${role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border text-gray-800 rounded-tl-none'}">
+        rowDiv.innerHTML = `
+            <div class="max-w-[85%] rounded-2xl p-4 shadow-sm ${
+                role === 'user' 
+                ? 'bg-blue-600 text-white rounded-tr-none' 
+                : 'bg-white border text-gray-800 rounded-tl-none'
+            }">
                 <div class="prose prose-sm max-w-none ${role === 'user' ? 'text-white' : ''}">
                     ${text}
                 </div>
             </div>
         `;
-        chatWindow.appendChild(msgDiv);
+        
+        chatWindow.appendChild(rowDiv);
         scrollToBottom();
         return msgId;
     }
 
     function updateMessage(id, text) {
-        const target = document.getElementById(id);
-        if (target) {
-            // ในที่นี้ถ้า AI ส่งตาราง Markdown มา คุณอาจต้องใช้ Library เช่น marked.js ช่วยเรนเดอร์
-            // แต่เบื้องต้นใช้ innerHTML สำหรับ Text ปกติก่อน
-            target.querySelector('.prose').innerHTML = text;
+        const targetElement = document.getElementById(id);
+        if (targetElement) {
+            const proseDiv = targetElement.querySelector('.prose');
+            if (proseDiv) {
+                proseDiv.innerHTML = renderMarkdown(text);
+            }
+            scrollToBottom();
         }
     }
 </script>
+{% endblock scripts %}
 
 <style>
-    /* ปรับแต่งการแสดงผลตาราง Markdown ที่ได้จาก AI */
+    /* สไตล์สำหรับ Markdown Table */
     .prose table {
+        display: block;
         width: 100%;
+        overflow-x: auto;
         border-collapse: collapse;
-        margin-top: 1rem;
-        font-size: 0.875rem;
+        margin: 1rem 0;
+        background: white;
     }
     .prose th, .prose td {
         border: 1px solid #e5e7eb;
-        padding: 0.5rem;
+        padding: 8px 12px;
         text-align: left;
+        min-width: 120px;
     }
     .prose th {
+        background-color: #f3f4f6;
+        font-weight: 600;
+    }
+    .prose tr:nth-child(even) {
         background-color: #f9fafb;
     }
 </style>
