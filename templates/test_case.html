@@ -103,10 +103,12 @@
 
         if (welcomeScreen) welcomeScreen.style.display = 'none';
 
+        // 1. เพิ่มข้อความ User (ไม่ต้องเก็บ ID เพราะเราจะไม่ไปอัปเดตมัน)
         appendMessage('user', message);
         userInput.value = ''; 
+        scrollToBottom();
 
-        // สร้างกล่อง Loading
+        // 2. เพิ่มกล่อง Loading และเก็บ ID ไว้ในตัวแปร loadingId เพื่อใช้แทนที่ภายหลัง
         const loadingId = appendMessage('assistant', '<i class="fas fa-ellipsis-h fa-beat"></i> Thinking...');
 
         try {
@@ -129,30 +131,32 @@
                     document.getElementById('chat-title').innerText = data.chat_title;
                     window.history.pushState({}, '', `/chat/${data.session_id}`);
                     
-                    // อัปเดต Sidebar ขวา (ถ้ามีฟังก์ชันนี้)
                     if (window.appendNewChatToSidebar) {
                         const now = new Date();
                         const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} · Today`;
-                        appendNewChatToSidebar(data.session_id, data.chat_title, timeStr);
+                        window.appendNewChatToSidebar(data.session_id, data.chat_title, timeStr);
                     }
                 }
                 
-                // แทนที่ "กำลังคิด" ด้วยคำตอบจริง
+                // 3. นำคำตอบจาก AI ไปใส่แทนที่ในกล่องที่มี ID ตรงกับ loadingId เท่านั้น
                 updateMessage(loadingId, data.answer);
             } else {
                 updateMessage(loadingId, "Error: " + data.message);
             }
         } catch (error) {
-            updateMessage(loadingId, "ขออภัย ไม่สามารถเชื่อมต่อกับ AI ได้ (ตรวจสอบ Ollama)");
+            updateMessage(loadingId, "❌ ไม่สามารถเชื่อมต่อกับ AI ได้");
         }
+        scrollToBottom();
     }
 
     function appendMessage(role, text) {
-        const msgId = 'msg-' + Date.now();
+        // สร้าง ID แบบสุ่มเพื่อให้ไม่ซ้ำกันในแต่ละกล่อง
+        const msgId = 'msg-' + Date.now() + Math.floor(Math.random() * 1000);
         const rowDiv = document.createElement('div');
-        rowDiv.id = msgId;
+        rowDiv.id = msgId; // ติด ID ไว้ที่กล่องนอกสุด
         rowDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4`;
         
+        // UI Style เดิมที่คุณใช้
         rowDiv.innerHTML = `
             <div class="max-w-[85%] rounded-2xl p-4 shadow-sm ${
                 role === 'user' 
@@ -167,7 +171,7 @@
         
         chatWindow.appendChild(rowDiv);
         scrollToBottom();
-        return msgId;
+        return msgId; // ส่ง ID กลับไปให้ handleSend
     }
 
     function updateMessage(id, text) {
@@ -175,6 +179,7 @@
         if (targetElement) {
             const proseDiv = targetElement.querySelector('.prose');
             if (proseDiv) {
+                // แปลง Markdown และใส่ลงในกล่องเดิมที่ระบุไว้
                 proseDiv.innerHTML = renderMarkdown(text);
             }
             scrollToBottom();
@@ -184,27 +189,29 @@
 {% endblock scripts %}
 
 <style>
-    /* สไตล์สำหรับ Markdown Table */
+    /* ตกแต่งตารางภายในกล่องแชท (.prose) */
     .prose table {
-        display: block;
         width: 100%;
-        overflow-x: auto;
         border-collapse: collapse;
         margin: 1rem 0;
         background: white;
+        font-size: 0.85rem;
+        display: block;
+        overflow-x: auto; /* สำหรับกรณีตารางกว้างเกินหน้าจอ */
     }
     .prose th, .prose td {
-        border: 1px solid #e5e7eb;
-        padding: 8px 12px;
+        border: 1px solid #e2e8f0;
+        padding: 10px 12px;
         text-align: left;
         min-width: 120px;
     }
     .prose th {
-        background-color: #f3f4f6;
-        font-weight: 600;
+        background-color: #f8fafc;
+        font-weight: 700;
+        color: #1e293b;
     }
     .prose tr:nth-child(even) {
-        background-color: #f9fafb;
+        background-color: #f1f5f9;
     }
 </style>
 {% endblock %}
