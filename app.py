@@ -126,7 +126,18 @@ def send_message():
         # 2. ตั้งค่า System Instruction
         system_instructions = ""
         if chat_session.generator_type == GenType.case:
-            system_instructions = "You are a QA Expert. Generate detailed Test Cases Included TCID, Description in Markdown Table format."
+            system_instructions = (
+                "You are a top software tester. Your sole task is to generate a detailed Markdown table "
+                "of test cases based on a given requirement. Consider edge cases and negative cases. "
+                "The table MUST include the following columns: "
+                "| ID | Scenario | Prerequisites | Steps | Test Data | Expected Results | Actual Results | Status |\n"
+                "|---|---|---|---|---|---|---|---|\n"
+                "Instructions:\n"
+                "1. Start ID at 'TC-001' if not specified.\n"
+                "2. 'Actual Results' and 'Status' must be left empty.\n"
+                "3. Use Markdown line breaks (<br>) within cells if steps or results have multiple points.\n"
+                "4. Output ONLY the table. Do not write any text outside of the Markdown table."
+            )
         else:
             system_instructions = "You are a Senior Developer. Generate clean, executable Test Scripts (e.g., Robot Framework or Python)."
 
