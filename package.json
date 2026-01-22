@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "@tailwindcss/cli": "^4.1.18",
+    "requests": "^0.3.0",
     "tailwindcss": "^4.1.18"
   }
 }
