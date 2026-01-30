@@ -69,7 +69,6 @@
     // ฟังก์ชันสำหรับแปลง Markdown เป็น HTML (ตาราง)
     function renderMarkdown(text) {
         if (typeof marked !== 'undefined') {
-            // ปรับแต่ง marked ให้รองรับตาราง (gfm: true)
             marked.setOptions({
                 gfm: true,
                 breaks: true
