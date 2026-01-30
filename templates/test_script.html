@@ -1,24 +1,209 @@
 {% extends 'layout.html' %}
-{% block title %}Test script Generator{% endblock %}
+{% block title %}Test Script Generator{% endblock %}
 
 {% block content %}
-<div class="bg-white rounded-xl shadow-lg flex-1 flex flex-col overflow-hidden">
-    <div class="p-5 font-bold text-2xl">Test Script Generator</div>
-    <div id="chat-box" class="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
-        <div class="flex gap-3">
-            <div class="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center shadow-sm">
-                <i class="fas fa-robot text-white"></i>
-            </div>
-            <div class="bg-white p-4 rounded-2xl shadow-sm border max-w-2xl text-gray-700">
-                สวัสดีครับ! บอกผมได้เลยว่าคุณต้องการ Script สำหรับฟังก์ชันไหน?
-            </div>
+<div class="bg-white rounded-xl shadow-lg flex-1 flex flex-col overflow-hidden h-full">
+    <div class="p-6 border-b flex justify-between items-center bg-white">
+        <div>
+            <h1 id="chat-title" class="text-2xl font-bold text-gray-800">
+                {% if session %}{{ session.title }}{% else %}Test Script Generator{% endif %}
+            </h1>
+            <p class="text-sm text-gray-500">
+                Session ID: <span id="display-session-id">{{ session.id if session else 'New Session' }}</span> 
+                | Model: <span class="font-semibold text-purple-600">Qwen 2.5 Coder</span>
+            </p>
         </div>
+        <span class="px-3 py-1 bg-purple-100 text-purple-600 rounded-full text-xs font-semibold">
+            {{ active_page | upper }}
+        </span>
     </div>
-    <div class="p-6 bg-white">
-        <div class="relative">
-            <input type="text" class="w-full pl-6 pr-14 py-4 bg-gray-100 rounded-2xl outline-none" placeholder="Type your function here...">
-            <button class="absolute right-4 top-1/2 -translate-y-1/2 text-purple-600"><i class="fas fa-paper-plane"></i></button>
-        </div>
+    
+    <div id="chat-window" class="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50">
+        {% if not session or not session.messages %}
+            <div id="welcome-screen" class="flex flex-col items-center justify-center h-full text-center space-y-4">
+                <div class="bg-purple-600 text-white p-4 rounded-full shadow-lg">
+                    <i class="fas fa-code text-3xl"></i>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-700">พร้อมช่วยเขียน Automation Script แล้ว!</h2>
+                <p class="text-gray-500 max-w-sm">ลองพิมพ์บอกรายละเอียด เช่น "เขียน Cypress script สำหรับทดสอบการ Login"</p>
+            </div>
+        {% else %}
+            {% for msg in session.messages %}
+                <div class="flex {{ 'justify-end' if msg.role.name == 'user' else 'justify-start' }} mb-4">
+                    <div class="max-w-[85%] rounded-2xl p-4 shadow-sm {{ 'bg-purple-600 text-white rounded-tr-none' if msg.role.name == 'user' else 'bg-white border text-gray-800 rounded-tl-none' }}">
+                        <div class="prose prose-sm max-w-none {{ 'text-white' if msg.role.name == 'user' else '' }}">
+                            {{ msg.content }}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+        <div id="anchor"></div>
+    </div>
+
+    <div class="p-4 bg-white border-t">
+        <form id="chat-form" class="relative flex items-center space-x-2" onsubmit="event.preventDefault(); handleSend();">
+            <input type="text" id="user-input" 
+                   class="h-12 w-full p-4 bg-gray-100 border-none rounded-full pr-14 focus:ring-2 focus:ring-purple-500 outline-none transition-all" 
+                   placeholder="พิมพ์รายละเอียดฟังก์ชันที่ต้องการทำ Script..."
+                   autocomplete="off">
+            <button type="submit" id="send-btn"
+                    class="absolute right-3 bg-purple-600 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-purple-700 transition-colors shadow-md">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </form>
     </div>
 </div>
+
+{% block scripts %}
+<script>
+    const chatWindow = document.getElementById('chat-window');
+    const userInput = document.getElementById('user-input');
+    const welcomeScreen = document.getElementById('welcome-screen');
+    let currentSessionId = "{{ session.id if session else 'null' }}";
+
+    function scrollToBottom() {
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function renderMarkdown(text) {
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                gfm: true,
+                breaks: true
+            });
+            return marked.parse(text);
+        }
+        return text;
+    }
+
+    // เรนเดอร์ข้อความเก่าเมื่อโหลดหน้า
+    document.addEventListener('DOMContentLoaded', () => {
+        const allProseMessages = document.querySelectorAll('.prose');
+        allProseMessages.forEach(container => {
+            const rawContent = container.textContent.trim();
+            if (rawContent) {
+                container.innerHTML = renderMarkdown(rawContent);
+            }
+        });
+        scrollToBottom();
+    });
+
+    async function handleSend() {
+        const message = userInput.value.trim();
+        if (!message) return;
+
+        if (welcomeScreen) welcomeScreen.style.display = 'none';
+
+        appendMessage('user', message);
+        userInput.value = ''; 
+        scrollToBottom();
+
+        const loadingId = appendMessage('assistant', '<i class="fas fa-ellipsis-h fa-beat"></i> Thinking and Coding...');
+
+        try {
+            const response = await fetch('/send_message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: currentSessionId,
+                    message: message,
+                    type: "script" // ระบุเป็น script เพื่อให้ Backend เลือก Qwen Coder
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                if (currentSessionId === 'null') {
+                    currentSessionId = data.session_id;
+                    document.getElementById('display-session-id').innerText = data.session_id;
+                    document.getElementById('chat-title').innerText = data.chat_title;
+                    window.history.pushState({}, '', `/chat/${data.session_id}`);
+                    
+                    if (window.appendNewChatToSidebar) {
+                        const now = new Date();
+                        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} · Today`;
+                        window.appendNewChatToSidebar(data.session_id, data.chat_title, timeStr);
+                    }
+                }
+                updateMessage(loadingId, data.answer);
+            } else {
+                updateMessage(loadingId, "Error: " + data.message);
+            }
+        } catch (error) {
+            updateMessage(loadingId, "❌ ไม่สามารถเชื่อมต่อกับ AI ได้");
+        }
+        scrollToBottom();
+    }
+
+    function appendMessage(role, text) {
+        const msgId = 'msg-' + Date.now() + Math.floor(Math.random() * 1000);
+        const rowDiv = document.createElement('div');
+        rowDiv.id = msgId;
+        rowDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4`;
+        
+        rowDiv.innerHTML = `
+            <div class="max-w-[85%] rounded-2xl p-4 shadow-sm ${
+                role === 'user' 
+                ? 'bg-purple-600 text-white rounded-tr-none' 
+                : 'bg-white border text-gray-800 rounded-tl-none'
+            }">
+                <div class="prose prose-sm max-w-none ${role === 'user' ? 'text-white' : ''}">
+                    ${text}
+                </div>
+            </div>
+        `;
+        
+        chatWindow.appendChild(rowDiv);
+        scrollToBottom();
+        return msgId;
+    }
+
+    function updateMessage(id, text) {
+        const targetElement = document.getElementById(id);
+        if (targetElement) {
+            const proseDiv = targetElement.querySelector('.prose');
+            if (proseDiv) {
+                proseDiv.innerHTML = renderMarkdown(text);
+            }
+            scrollToBottom();
+        }
+    }
+</script>
+{% endblock scripts %}
+
+<style>
+    /* ตกแต่งตารางและ Code Block สำหรับหน้า Script */
+    .prose pre {
+        background-color: #1e293b;
+        color: #f8fafc;
+        padding: 1rem;
+        border-radius: 0.75rem;
+        overflow-x: auto;
+        margin: 1rem 0;
+    }
+    .prose code {
+        font-family: 'Fira Code', monospace;
+        font-size: 0.9em;
+    }
+    .prose table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        background: white;
+        display: block;
+        overflow-x: auto;
+    }
+    .prose th, .prose td {
+        border: 1px solid #e2e8f0;
+        padding: 10px 12px;
+        text-align: left;
+        min-width: 120px;
+    }
+    .prose th {
+        background-color: #f8fafc;
+        font-weight: 700;
+    }
+</style>
 {% endblock %}

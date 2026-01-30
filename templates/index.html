@@ -2,24 +2,68 @@
 {% block title %}Home - Dashboard{% endblock %}
 
 {% block content %}
-<div class="bg-white rounded-xl shadow-lg flex-1 p-10 overflow-y-auto">
+<div class="bg-white rounded-xl shadow-lg flex-1 p-10 overflow-y-auto min-w-0">
     <div class="max-w-4xl mx-auto">
         <h1 class="text-4xl font-extrabold text-gray-900 mb-4">Welcome to AI Test System</h1>
         <p class="text-gray-600 text-xl mb-12">เลือกเครื่องมือที่คุณต้องการเพื่อเริ่มสร้าง Test Artifacts ด้วย AI</p>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="group p-8 bg-white border-2 border-gray-100 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-14">
+            <div class="group p-8 bg-white border-2 border-gray-100 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all duration-500">
                 <div class="text-blue-600 mb-4"><i class="fas fa-file-invoice text-4xl"></i></div>
                 <h2 class="text-2xl font-bold mb-3">Test Case Generator</h2>
                 <p class="text-gray-500 mb-6">สร้างแผนการทดสอบและ Scenario อย่างละเอียด</p>
-                <a href="{{ url_for('new_chat', type='case') }}" class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700">เริ่มใช้งาน</a>
+                <a href="{{ url_for('test_case') }}" class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors duration-500">เริ่มใช้งาน</a>
             </div>
 
-            <div class="group p-8 bg-white border-2 border-gray-100 rounded-2xl hover:border-purple-500 hover:shadow-xl transition-all">
+            <div class="group p-8 bg-white border-2 border-gray-100 rounded-2xl hover:border-purple-500 hover:shadow-xl transition-all duration-500">
                 <div class="text-purple-600 mb-4"><i class="fas fa-terminal text-4xl"></i></div>
                 <h2 class="text-2xl font-bold mb-3">Test Script Generator</h2>
                 <p class="text-gray-500 mb-6">สร้าง Automation Code สำหรับ Selenium, Cypress และอื่นๆ</p>
-                <a href="{{ url_for('new_chat', type='script') }}" class="inline-block bg-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-purple-700">เริ่มใช้งาน</a>
+                <a href="{{ url_for('test_script') }}" class="inline-block bg-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors duration-500">เริ่มใช้งาน</a>
+            </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-8 border border-gray-100">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800 flex items-center gap-3">
+                    <i class="fas fa-history text-gray-400"></i>
+                    Recent History
+                </h3>
+            </div>
+
+            <div class="space-y-4">
+                {% if sessions %}
+                    {% for chat in sessions[:3] %}
+                    <a href="{{ url_for('view_chat', session_id=chat.id) }}" 
+                       class="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 hover:border-blue-300 hover:shadow-md transition-all group duration-500">
+                        <div class="flex items-center gap-4 overflow-hidden">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-500 {{ 'bg-blue-50 text-blue-500' if chat.generator_type.name == 'case' else 'bg-purple-50 text-purple-500' }}">
+                                <i class="fas {{ 'fa-file-alt' if chat.generator_type.name == 'case' else 'fa-code' }}"></i>
+                            </div>
+                            <div class="truncate">
+                                <p class="font-bold text-gray-700 group-hover:text-blue-600 transition-colors truncate duration-500">{{ chat.title }}</p>
+                                <p class="text-xs text-gray-400">
+                                    {% if chat.updated_at %}
+                                        {{ chat.updated_at.strftime('%d %b %Y · %H:%M') }}
+                                    {% else %}
+                                        {{ chat.created_at.strftime('%d %b %Y · %H:%M') if chat.created_at else 'No date' }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0 ml-4">
+                            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md duration-500 {{ 'bg-blue-100 text-blue-600' if chat.generator_type.name == 'case' else 'bg-purple-100 text-purple-600' }}">
+                                {{ chat.generator_type.name }}
+                            </span>
+                            <i class="fas fa-chevron-right text-gray-300 group-hover:text-blue-400 transition-colors"></i>
+                        </div>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-10">
+                        <p class="text-gray-400 italic">ยังไม่มีประวัติการสร้าง Test Artifacts</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
