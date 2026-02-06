@@ -1,0 +1,28 @@
+# --- Next.js / Node.js (Frontend) ---
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env*.local
+frontend/npm-debug.log*
+
+# --- FastAPI / Python (Backend) ---
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/.pytest_cache/
+
+# --- Database (SQLite) ---
+backend/*.db
+backend/*.sqlite3
+
+# --- OS / IDE Files ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Electron ---
+dist/
+*.executable
