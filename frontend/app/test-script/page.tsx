@@ -55,7 +55,7 @@ export default function TestScriptPage() {
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-3 opacity-60">
             <Code2 size={48} strokeWidth={1.5} />
-            <p className="text-sm font-medium">พิมพ์รายละเอียดสคริปต์ที่ต้องการสร้าง (เช่น Cypress, Selenium)</p>
+            <p className="text-sm font-medium">Type the details of the script you want to create (Postman).</p>
           </div>
         )}
 
@@ -93,10 +93,9 @@ export default function TestScriptPage() {
           onChange={(e) => setInput(e.target.value)}
           disabled={isLoading}
           className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white text-black transition-all disabled:opacity-50"
-          placeholder="พิมพ์รายละเอียดสคริปต์ที่ต้องการ..."
+          placeholder="Type the details of the script you want..."
         />
         <button 
-        //   ฆฆ
           className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-lg shadow-purple-100 active:scale-95 shrink-0"
         >
           <Send size={20} />

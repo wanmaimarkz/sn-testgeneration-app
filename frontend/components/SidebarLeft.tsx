@@ -9,9 +9,9 @@ export default function SidebarLeft() {
   // 2. เปลี่ยนชื่อ icon เป็น Component
   const menuItems = [
     { name: 'Dashboard', icon: House, path: '/' },
-    { name: 'Test Case', icon: FileText, path: '/test-case' },
-    { name: 'Test Script', icon: Terminal, path: '/test-script' },
-    { name: 'Profile', icon: UserCircle, path: '/profile' },
+    { name: 'Test Case', icon: FileText, path: '/test-case/' },
+    { name: 'Test Script', icon: Terminal, path: '/test-script/' },
+    { name: 'Profile', icon: UserCircle, path: '/profile/' },
   ];
 
   return (

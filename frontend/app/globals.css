@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+@layer components {
+  .prose table {
+    @apply w-full my-4 border-collapse;
+  }
+  .prose th {
+    @apply text-left font-bold text-gray-800 border-b border-gray-100 pb-2 px-2;
+  }
+  .prose td {
+    @apply py-3 px-2 text-gray-600 border-b border-gray-50 align-top;
+  }
+  /* ซ่อนขีดกลางในตาราง Markdown ดั้งเดิม */
+  .prose thead {
+    @apply border-none;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
