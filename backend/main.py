@@ -1,0 +1,55 @@
+import uvicorn
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from db import create_db_and_tables
+import dependency # Import the module to modify globals
+from router import auth, chat # We will create chat.py next
+from llama_cpp import Llama
+import chromadb
+
+# --- LIFECYCLE MANAGER ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 1. Load DB
+    create_db_and_tables()
+    
+    # 2. Load LLM (The 4B model)
+    print("8 Loading LLM into RAM...")
+    dependency.llm_model = Llama(
+        model_path="local/Qwen3-4B-Instruct-2507-UD-Q8_K_XL.gguf", # Update filename if needed
+        n_ctx=16384,
+        n_gpu_layers=-1, # Offload to GPU
+        verbose=False
+    )
+
+    # 3. Load Embedding Model
+    print("8 Loading Embedding Model into RAM...")
+    dependency.embed_model = Llama(
+        model_path="local/Qwen3-Embedding-4B-Q8_0.gguf", # Must match ingest.py model
+        n_ctx=8192,
+        embedding=True, # <--- CRITICAL FLAG
+        verbose=False,
+        n_gpu_layers=-1
+    )
+    
+    # 4. Load Vector DB
+    print("8 Connecting to ChromaDB...")
+    client = chromadb.PersistentClient(path="database/vector")
+    dependency.chroma_collection = client.get_collection("use_case_knowledge")
+    
+    print("1 System Ready!")
+    yield
+    # Cleanup (if needed) goes here
+
+app = FastAPI(lifespan=lifespan)
+
+app.include_router(auth.router)
+app.include_router(chat.router)
+
+# --- HEALTH CHECK ---
+@app.get("/")
+def health_check():    
+    return {"health": "OK"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000)
