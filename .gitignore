@@ -12,8 +12,8 @@ backend/__pycache__/
 backend/*.pyc
 backend/.env
 backend/.pytest_cache/
-backend/database
-backend/local
+backend/database/*
+backend/local/*
 
 # --- Database (SQLite) ---
 backend/*.db

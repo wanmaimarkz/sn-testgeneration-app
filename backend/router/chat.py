@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from datetime import datetime
 
 
-router = APIRouter(prefix="/chat", tags=["RAG Generation"])
+router = APIRouter(prefix="/api/chat", tags=["RAG Generation"])
 
 # --- SCHEMAS ---
 class UserQuery(BaseModel):
@@ -81,9 +81,8 @@ def generate(
         query_embeddings=[query_vec], # <--- Search by vector, not text
         n_results=3
     )
-    
-    # ... rest of the code ...
-    context_chunks = results['documents'][0]
+
+    context_chunks = results['documents'][0] if results['documents'] else ''
     # END RETRIEVAL
     
     # 2. Build Prompt

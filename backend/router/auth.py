@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from dependency import get_db_session
 from model import User
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 class UserAuth(BaseModel):
     username: str
@@ -16,7 +16,7 @@ class UserAuth(BaseModel):
 def health_check():    
     return {"health": "OK"}
 
-@router.post("/signup", status_code=201)
+@router.post("/register", status_code=201)
 def sign_up(user_data: UserAuth, session: Session = Depends(get_db_session)):
     # Check if user exists
     statement = select(User).where(User.username == user_data.username)
