@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from db import create_db_and_tables
 import dependency # Import the module to modify globals
-from router import auth, chat # We will create chat.py next
+from router import auth, chat, folder
 from llama_cpp import Llama
 import chromadb
 
@@ -45,6 +45,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(auth.router)
 app.include_router(chat.router)
+app.include_router(folder.router)
 
 # --- HEALTH CHECK ---
 @app.get("/")
