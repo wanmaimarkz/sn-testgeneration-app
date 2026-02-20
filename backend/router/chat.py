@@ -297,12 +297,6 @@ def move_chat(
         if not folder:
             raise HTTPException(status_code=404, detail="Target folder not found")
 
-        # Optional: Verify the folder belongs to the same user as the chat
-        if folder.user_id != chat.user_id:
-            raise HTTPException(
-                status_code=403, detail="Folder belongs to a different user"
-            )
-
     # 3. Update and save
     chat.folder_id = move_data.folder_id
     session.add(chat)
