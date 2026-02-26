@@ -6,6 +6,7 @@ import dependency # Import the module to modify globals
 from router import auth, chat, folder
 from llama_cpp import Llama
 import chromadb
+from fastapi.middleware.cors import CORSMiddleware
 
 # --- LIFECYCLE MANAGER ---
 @asynccontextmanager
@@ -42,6 +43,14 @@ async def lifespan(app: FastAPI):
     # Cleanup (if needed) goes here
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"], # อนุญาต Next.js
+    allow_credentials=True,
+    allow_methods=["*"], # อนุญาตทุก Method (รวมถึง OPTIONS, POST, GET)
+    allow_headers=["*"], # อนุญาตทุก Headers
+)
 
 app.include_router(auth.router)
 app.include_router(chat.router)

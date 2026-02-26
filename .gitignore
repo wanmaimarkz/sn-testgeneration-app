@@ -10,6 +10,7 @@ frontend/npm-debug.log*
 # จัดการ virtual environment
 backend/venv/
 **/venv/
+backend/venv/*
 
 # Cache และไฟล์คอมไพล์ต่างๆ
 **/__pycache__/
