@@ -7,17 +7,29 @@ frontend/.env*.local
 frontend/npm-debug.log*
 
 # --- FastAPI / Python (Backend) ---
-.venv
-backend/__pycache__/
-backend/*.pyc
+# จัดการ virtual environment
+backend/venv/
+**/venv/
+
+# Cache และไฟล์คอมไพล์ต่างๆ
+**/__pycache__/
+**/*.py[cod]
+**/*.pyc
 backend/.env
 backend/.pytest_cache/
-backend/database/*
-backend/local/*
 
-# --- Database (SQLite) ---
-backend/*.db
-backend/*.sqlite3
+# --- Local LLM & Models ---
+# ยกเว้นไฟล์โมเดลในโฟลเดอร์ local แต่ยังคงโฟลเดอร์ไว้
+backend/local/*
+!backend/local/.gitkeep
+
+# --- Database ---
+# ยกเว้นไฟล์ database แต่ยังคงโครงสร้างโฟลเดอร์ database/relational หรือ vector ไว้
+backend/database/**/*.db
+backend/database/**/*.sqlite3
+# หากต้องการ ignore ทุกอย่างใน database ยกเว้นโฟลเดอร์ว่าง
+# backend/database/*
+# !backend/database/.gitkeep
 
 # --- OS / IDE Files ---
 .DS_Store
@@ -25,6 +37,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# --- Electron ---
+# --- Electron / Build ---
 dist/
 *.executable

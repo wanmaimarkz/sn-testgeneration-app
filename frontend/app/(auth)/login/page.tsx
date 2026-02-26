@@ -26,7 +26,7 @@ export default function LoginPage() {
             <input 
               type={showPassword ? "text" : "password"} 
               className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-              placeholder="••••••••"
+              placeholder="Enter your password..."
             />
             <button 
               type="button"
