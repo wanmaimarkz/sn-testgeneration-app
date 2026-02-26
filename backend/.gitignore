@@ -1,0 +1,26 @@
+# --- Python Specific ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# --- Local LLM & Models ---
+# ยกเว้นไฟล์โมเดลขนาดใหญ่ (.gguf) ในโฟลเดอร์ local
+local/*.gguf
+
+# --- Database & Storage ---
+# หากมีไฟล์ database ท้องถิ่น (เช่น sqlite)
+*.db
+*.sqlite3
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+# --- IDE Specific ---
+.vscode/
+.idea/
