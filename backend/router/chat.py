@@ -1,7 +1,7 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, create_model
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from dependency import get_embedding_model, get_llm, get_rag_collection, get_db_session
 import io
 from fastapi.responses import StreamingResponse
@@ -156,13 +156,13 @@ def generate_test_case(
         },  # ChromaDB requires string/int/float values
     )
 
+    # 4. Build Schema & Inference
+    
     if not results["documents"] or not results["documents"][0]:
-        context_text = "No context found."
+        context_text = "No context found. Rely on general QA best practices."
     else:
         context_text = "\n\n".join(results["documents"][0])
 
-    # 4. Build Schema & Inference
-    context_text = "\n\n".join(results["documents"][0])
     dynamic_schema = build_dynamic_json_schema(query.columns)
 
     output = llm.create_chat_completion(
