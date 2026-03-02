@@ -235,7 +235,7 @@ async def download_test_cases_csv(test_cases: List[Dict[str, Any]]):
     # Prepare the response
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
     response.headers["Content-Disposition"] = (
-        "attachment; filename=dynamic_test_cases.csv"
+        "attachment; filename=test_cases.csv"
     )
 
     return response
