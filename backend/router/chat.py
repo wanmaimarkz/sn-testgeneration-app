@@ -157,7 +157,7 @@ def generate_test_case(
     )
 
     # 4. Build Schema & Inference
-    
+
     if not results["documents"] or not results["documents"][0]:
         context_text = "No context found. Rely on general QA best practices."
     else:
@@ -234,9 +234,7 @@ async def download_test_cases_csv(test_cases: List[Dict[str, Any]]):
 
     # Prepare the response
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
-    response.headers["Content-Disposition"] = (
-        "attachment; filename=test_cases.csv"
-    )
+    response.headers["Content-Disposition"] = "attachment; filename=test_cases.csv"
 
     return response
 
@@ -336,3 +334,31 @@ def move_chat(
         else "Removed from folder"
     )
     return {"message": status_msg, "chat_id": chat.id, "folder_id": chat.folder_id}
+
+
+@router.delete("/{chat_id}")
+def delete_chat(
+    chat_id: int,
+    session: Session = Depends(get_db_session),
+    collection=Depends(get_rag_collection),
+):
+    # 1. Verify chat exists
+    chat = session.get(Chat, chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    # 2. Delete Messages from SQLite
+    statement = select(Message).where(Message.chat_id == chat_id)
+    messages = session.exec(statement).all()
+    for msg in messages:
+        session.delete(msg)
+
+    # 3. Delete Document Vectors from ChromaDB
+    # This prevents orphaned vector data from taking up disk space
+    collection.delete(where={"chat_id": str(chat_id)})
+
+    # 4. Delete Chat from SQLite
+    session.delete(chat)
+    session.commit()
+
+    return {"message": f"Chat {chat_id} and its associated data deleted successfully"}
