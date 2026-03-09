@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from pydantic import BaseModel
-from database import get_session
+from dependency import get_db_session
 from model import User
 from passlib.context import CryptContext
 
@@ -27,7 +27,7 @@ class PasswordUpdate(BaseModel):
 
 
 @router.patch("/username")
-def change_username(data: UsernameUpdate, session: Session = Depends(get_session)):
+def change_username(data: UsernameUpdate, session: Session = Depends(get_db_session)):
     # 1. Verify user exists
     user = session.get(User, data.user_id)
     if not user:
@@ -49,7 +49,7 @@ def change_username(data: UsernameUpdate, session: Session = Depends(get_session
 
 
 @router.patch("/password")
-def change_password(data: PasswordUpdate, session: Session = Depends(get_session)):
+def change_password(data: PasswordUpdate, session: Session = Depends(get_db_session)):
     # 1. Verify user exists
     user = session.get(User, data.user_id)
     if not user:
