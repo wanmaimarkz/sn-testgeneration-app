@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from db import create_db_and_tables
 import dependency # Import the module to modify globals
-from router import auth, chat, folder
+from router import auth, chat, folder, profile
 from llama_cpp import Llama
 import chromadb
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,6 +55,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(folder.router)
+app.include_router(profile.router)
 
 # --- HEALTH CHECK ---
 @app.get("/")
