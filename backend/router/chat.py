@@ -47,6 +47,10 @@ class ChatCreate(BaseModel):
     user_id: int
 
 
+class ChatRename(BaseModel):
+    name: str
+
+
 # --- HELPER: CONSTRUCT PROMPT ---
 def build_dynamic_json_schema(columns: List[str]) -> dict:
     """Dynamically creates a Pydantic model and returns its JSON schema."""
@@ -362,3 +366,25 @@ def delete_chat(
     session.commit()
 
     return {"message": f"Chat {chat_id} and its associated data deleted successfully"}
+
+
+@router.patch("/{chat_id}/rename")
+def rename_chat(
+    chat_id: int, rename_data: ChatRename, session: Session = Depends(get_db_session)
+):
+    # 1. Verify chat exists
+    chat = session.get(Chat, chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    # 2. Update name and save
+    chat.name = rename_data.name
+    session.add(chat)
+    session.commit()
+    session.refresh(chat)
+
+    return {
+        "message": "Chat renamed successfully",
+        "chat_id": chat.id,
+        "new_name": chat.name,
+    }

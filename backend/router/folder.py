@@ -12,6 +12,10 @@ class FolderCreate(BaseModel):
     user_id: int
 
 
+class FolderRename(BaseModel):
+    name: str
+
+
 @router.post("/")
 def create_folder(folder_in: FolderCreate, session: Session = Depends(get_db_session)):
     db_folder = Folder(name=folder_in.name, user_id=folder_in.user_id)
@@ -57,4 +61,28 @@ def delete_folder(
     return {
         "message": f"Folder {folder_id} deleted successfully.",
         "chats_deleted": len(chats),
+    }
+
+
+@router.patch("/{folder_id}/rename")
+def rename_folder(
+    folder_id: int,
+    rename_data: FolderRename,
+    session: Session = Depends(get_db_session),
+):
+    # 1. Verify folder exists
+    folder = session.get(Folder, folder_id)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    # 2. Update name and save
+    folder.name = rename_data.name
+    session.add(folder)
+    session.commit()
+    session.refresh(folder)
+
+    return {
+        "message": "Folder renamed successfully",
+        "folder_id": folder.id,
+        "new_name": folder.name,
     }
