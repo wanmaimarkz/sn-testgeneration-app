@@ -13,7 +13,7 @@ from uuid import uuid4
 from model import Chat, Message, Folder
 from sqlmodel import Session, select
 
-router = APIRouter(prefix="/api/chat", tags=["RAG Generation"])
+router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
 
 # --- SCHEMAS ---

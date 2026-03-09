@@ -51,4 +51,4 @@ def login(user_data: UserAuth, session: Session = Depends(get_db_session)):
     ):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return {"message": "Login successful", "user_id": user.id, "user": user.username}
+    return {"message": "Login successful", "user_id": user.id, "username": user.username}

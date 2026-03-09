@@ -2,10 +2,29 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation'; // 1. เพิ่ม useRouter
 import { House, FileText, Terminal, UserCircle, LogOut } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export default function SidebarLeft() {
   const pathname = usePathname();
   const router = useRouter(); // 2. ประกาศตัวแปร router
+  const [username, setUsername] = useState('');
+
+  useEffect(() => {
+    // Parse the JSON object from local storage
+    const storedUserStr = localStorage.getItem('user');
+
+    if (storedUserStr) {
+      try {
+        const userData = JSON.parse(storedUserStr);
+
+        if (userData.username) {
+          setUsername(userData.username);
+        }
+      } catch (e) {
+        console.error("Failed to parse user data", e);
+      }
+    }
+  }, []);
 
   const menuItems = [
     { name: 'Dashboard', icon: House, path: '/' },
@@ -54,7 +73,7 @@ export default function SidebarLeft() {
         className="flex items-center gap-3 p-4 rounded-2xl text-red-500 font-bold hover:bg-red-50 transition-colors w-full"
       >
         <LogOut size={22} strokeWidth={2.5} />
-        Logout
+        Logout ({username})
       </button>
     </nav>
   );
