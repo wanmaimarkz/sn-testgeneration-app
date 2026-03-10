@@ -25,7 +25,6 @@ export default function ProfilePage() {
         const userData = JSON.parse(storedUserStr);
         // Handle variations of the ID key (user_id or id) depending on your API
         if (userData.user_id) setUserId(userData.user_id);
-        else if (userData.id) setUserId(userData.id);
 
         if (userData.username) {
           setUsername(userData.username);
@@ -87,7 +86,7 @@ export default function ProfilePage() {
           throw new Error("Current password is required to set a new password.");
         }
 
-        const res = await fetch('http://127.0.0.1:8000/profile/password', {
+        const res = await fetch('http://127.0.0.1:8000/api/profile/password', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -145,7 +144,7 @@ export default function ProfilePage() {
 
             {/* Status Alert Banner */}
             {status.message && (
-              <div className={`p-4 rounded-2xl flex items-center gap-3 text-sm font-bold ${status.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              <div className={`p-3 rounded-2xl flex items-center gap-3 text-sm font-bold ${status.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
                 {status.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
                 {status.message}
               </div>
@@ -175,8 +174,8 @@ export default function ProfilePage() {
                 <h3 className="text-sm font-bold">Security & Password</h3>
               </div>
 
-              <div className="p-5 bg-red-50 rounded-3xl border border-red-300 space-y-3">
-                <div className="flex items-center gap-2 text-red-600">
+              <div className="p-5 bg-orange-50 rounded-3xl border border-orange-300 space-y-3">
+                <div className="flex items-center gap-2 text-orange-600">
                   <ShieldCheck size={18} />
                   <label className="text-xs font-black uppercase tracking-widest">Verify Current Password</label>
                 </div>
@@ -184,7 +183,7 @@ export default function ProfilePage() {
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full px-5 py-3.5 bg-white border border-red-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-gray-700"
+                  className="w-full px-5 py-3.5 bg-white border border-orange-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 text-gray-700"
                   placeholder="Required to change password"
                 />
               </div>
@@ -217,7 +216,7 @@ export default function ProfilePage() {
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full py-4 text-white rounded-2xl font-black shadow-lg transition-all flex items-center justify-center gap-3 
+              className={`w-full py-4 text-white rounded-2xl font-black shadow-lg transition-all flex items-center justify-center gap-3 cursor-pointer
                 ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 hover:shadow-blue-300 active:scale-[0.98]'}`}
             >
               <Save size={20} />

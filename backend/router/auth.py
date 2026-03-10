@@ -27,8 +27,7 @@ def sign_up(user_data: UserAuth, session: Session = Depends(get_db_session)):
         raise HTTPException(status_code=400, detail="Username already taken")
 
     # Create User
-    salt = bcrypt.gensalt()
-    hashed_pwd = bcrypt.hashpw(user_data.password.encode(), salt).decode()
+    hashed_pwd = bcrypt.hashpw(user_data.password.encode(), bcrypt.gensalt()).decode()
     new_user = User(username=user_data.username, hashed_password=hashed_pwd)
 
     session.add(new_user)

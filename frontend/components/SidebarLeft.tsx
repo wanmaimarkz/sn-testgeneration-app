@@ -70,7 +70,7 @@ export default function SidebarLeft() {
       {/* 4. เปลี่ยนจาก Link เป็น button เพื่อเรียกใช้ handleLogout */}
       <button 
         onClick={handleLogout} 
-        className="flex items-center gap-3 p-4 rounded-2xl text-red-500 font-bold hover:bg-red-50 transition-colors w-full"
+        className="flex items-center gap-3 p-4 rounded-2xl text-red-500 font-bold hover:bg-red-50 transition-colors w-full cursor-pointer"
       >
         <LogOut size={22} strokeWidth={2.5} />
         Logout ({username})

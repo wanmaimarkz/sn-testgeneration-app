@@ -3,12 +3,9 @@ from sqlmodel import Session, select
 from pydantic import BaseModel
 from dependency import get_db_session
 from model import User
-from passlib.context import CryptContext
+import bcrypt
 
 router = APIRouter(prefix="/api/profile", tags=["Profile"])
-
-# Use the same hashing context as your auth router
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # --- SCHEMAS ---
@@ -56,14 +53,16 @@ def change_password(data: PasswordUpdate, session: Session = Depends(get_db_sess
         raise HTTPException(status_code=404, detail="User not found")
 
     # 2. Verify current password is correct
-    if not pwd_context.verify(data.current_password, user.hashed_password):
+    if not bcrypt.checkpw(
+        data.current_password.encode(), user.hashed_password.encode()
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect current password",
         )
 
     # 3. Hash new password, update, and save
-    user.hashed_password = pwd_context.hash(data.new_password)
+    user.hashed_password = bcrypt.hashpw(data.new_password.encode(), bcrypt.gensalt())
     session.add(user)
     session.commit()
 
