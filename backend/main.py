@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from db import create_db_and_tables
 import dependency # Import the module to modify globals
-from router import auth, chat, folder
+from router import auth, chat, folder, profile
 from llama_cpp import Llama
 import chromadb
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,8 +17,8 @@ async def lifespan(app: FastAPI):
     # 2. Load LLM (The 4B model)
     print("8 Loading LLM into RAM...")
     dependency.llm_model = Llama(
-        model_path="local/Qwen3-4B-Instruct-2507-UD-Q8_K_XL.gguf", # Update filename if needed
-        n_ctx=16384,
+        model_path="local/Qwen3-4B-Instruct-2507.Q8_0.gguf", # Update filename if needed
+        n_ctx=32768,
         n_gpu_layers=-1, # Offload to GPU
         verbose=False
     )
@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     print("8 Loading Embedding Model into RAM...")
     dependency.embed_model = Llama(
         model_path="local/Qwen3-Embedding-4B-Q8_0.gguf", # Must match ingest.py model
-        n_ctx=8192,
+        n_ctx=16384,
         embedding=True, # <--- CRITICAL FLAG
         verbose=False,
         n_gpu_layers=-1
@@ -55,6 +55,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(folder.router)
+app.include_router(profile.router)
 
 # --- HEALTH CHECK ---
 @app.get("/")
