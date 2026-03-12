@@ -1,11 +1,11 @@
 'use client';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation'; // 1. เพิ่ม useRouter
+import { usePathname, useRouter } from 'next/navigation';
 import { House, FileText, Terminal, UserCircle, LogOut } from 'lucide-react';
 
 export default function SidebarLeft() {
   const pathname = usePathname();
-  const router = useRouter(); // 2. ประกาศตัวแปร router
+  const router = useRouter();
 
   const menuItems = [
     { name: 'Dashboard', icon: House, path: '/' },
@@ -24,8 +24,8 @@ export default function SidebarLeft() {
 
   return (
     <nav className="w-64 bg-white border-r h-full flex flex-col p-4 shadow-sm">
-      <div className="mb-10 px-2 flex items-center gap-3">
-        <span className="font-bold text-xl text-gray-800 tracking-tight">AI TestGen</span>
+      <div className="mb-10 px-2 pt-4 flex items-center gap-3">
+        <span className="font-bold text-4xl text-gray-800 tracking-tight">AI TestGen</span>
       </div>
 
       <div className="space-y-2 flex-1">

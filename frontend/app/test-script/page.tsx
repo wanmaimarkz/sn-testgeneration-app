@@ -115,7 +115,7 @@ export default function TestScriptPage() {
             <Terminal size={24} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight">Test Script Generator</h1>
+            <h1 className="text-xl font-bold text-gray-800 tracking-tight">AI Test Script Generator</h1>
             <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Model: Qwen 2.5 Coder (RAG Mode)</p>
           </div>
         </div>
@@ -194,7 +194,7 @@ export default function TestScriptPage() {
 
       {/* Input Form */}
       <form onSubmit={handleSend} className="p-4 bg-white border-t flex gap-3 items-center">
-        <input value={input} onChange={(e) => setInput(e.target.value)} disabled={isLoading} className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white text-black transition-all font-medium disabled:opacity-50" placeholder="e.g., Create a test script for user registration API..." />
+        <input value={input} onChange={(e) => setInput(e.target.value)} disabled={isLoading} className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white text-gray-600 transition-all font-medium disabled:opacity-50" placeholder="e.g., Create a test script for user registration API..." />
         <button disabled={isLoading || !input.trim()} className="bg-purple-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-100 active:scale-95 transition-all shrink-0"><Send size={20}/></button>
       </form>
     </div>
