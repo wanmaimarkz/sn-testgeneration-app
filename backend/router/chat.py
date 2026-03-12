@@ -173,19 +173,16 @@ def generate_test_case(
         messages=[
             {
                 "role": "system",
-                "content": "You are a top software tester. Your sole task is to generate a JSON array of test cases based on a given requirement. \
-                    Consider edge cases and negative cases. Each case, unless told otherwise, must have the following keys: \
-                    'id' (if not specified, start as 'TC-001'), 'scenario', 'prerequisites', 'steps', 'data' in array or null, 'expected' in array, 'actual' null, 'status' null. \
-                    Output your answer as a single JSON object in 'cases' array. Do not write any text outside of JSON.",
+                "content": "You are a top software tester. Your sole task is to generate a JSON array of test cases based on a given requirement. Consider edge cases and negative cases. Each case, unless told otherwise, must have the following keys: 'id' (if not specified, start as 'TC-001'), 'scenario', 'prerequisites', 'steps', 'data' in array or null, 'expected' in array, 'actual' null, 'status' null. Only output a single JSON object in 'cases' array. Texts in test cases must be concise.\n\nExample:\n{\"id\":\"TC-001\",\"scenario\":\"Verify theme toggle to Dark Mode\",\"prerequisites\":[\"App is in default Light Mode\"],\"steps\":[\"Navigate to Appearance Settings\",\"Click the 'Dark Mode' toggle\"],\"data\":null,\"expected\":[\"UI background changes to dark hex colors\",\"Text colors switch to light contrast\",\"Preference persists after refresh\"],\"actual\":null,\"status\":null}",
             },
             {
                 "role": "user",
-                "content": f"Documentation Context:\n{context_text}\n\nTask: Generate a test case for '{query.text}'.",
+                "content": f"Documentation Context:\n{context_text}\n--END OF CONTEXT--\n\nGenerate test cases for the following requirement: {query.text}",
             },
         ],
         response_format={"type": "json_object", "schema": dynamic_schema},
         temperature=0.1,
-        max_tokens=1024,
+        max_tokens=2048,
     )
 
     raw_json_string = output["choices"][0]["message"]["content"]
