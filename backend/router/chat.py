@@ -71,7 +71,7 @@ def build_dynamic_json_schema(columns: List[str]) -> dict:
     SingleTestCase = create_model('SingleTestCase', **fields)
     
     # 2. Create a WRAPPER schema that holds a LIST of single test cases
-    TestCaseList = create_model('TestCaseList', test_cases=(List[SingleTestCase], ...))
+    TestCaseList = create_model('TestCaseList', cases=(List[SingleTestCase], ...))
     
     # Return the JSON schema dictionary for the wrapper
     return TestCaseList.model_json_schema()
