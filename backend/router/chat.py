@@ -10,10 +10,13 @@ import os
 import shutil
 import pdfplumber
 from uuid import uuid4
-from model import Chat, Message, Folder
+from model import Chat, Message, Folder, User
 from sqlmodel import Session, select
+import requests
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
+
+HF_API_URL = "https://z7zxrhb7h2wgz7uj.us-east-1.aws.endpoints.huggingface.cloud"
 
 
 # --- SCHEMAS ---
@@ -21,6 +24,7 @@ class UserQuery(BaseModel):
     text: str
     chat_id: int
     columns: List[str]
+    model_source: str = "local"
 
 
 class TestCaseResponse(BaseModel):
@@ -53,22 +57,24 @@ class ChatRename(BaseModel):
 
 # --- HELPER: CONSTRUCT PROMPT ---
 def build_dynamic_json_schema(columns: List[str]) -> dict:
-    """Dynamically creates a Pydantic model and returns its JSON schema."""
+    """Dynamically creates a Pydantic schema for an ARRAY of test cases."""
     fields = {}
-
     list_columns = ["prerequisites", "steps", "data", "expected"]
-
+    
     for col in columns:
         if col in list_columns:
-            fields[col] = (List[str], ...)  # Required List of strings
+            fields[col] = (List[str], ...)
         else:
-            fields[col] = (str, ...)  # Required String
-
-    # Create the Pydantic model in memory
-    DynamicTestCase = create_model("DynamicTestCase", **fields)
-
-    # Return the JSON schema dictionary (use .schema() for Pydantic v1, .model_json_schema() for v2)
-    return DynamicTestCase.model_json_schema()
+            fields[col] = (str, ...)
+            
+    # 1. Create the schema for a SINGLE test case
+    SingleTestCase = create_model('SingleTestCase', **fields)
+    
+    # 2. Create a WRAPPER schema that holds a LIST of single test cases
+    TestCaseList = create_model('TestCaseList', test_cases=(List[SingleTestCase], ...))
+    
+    # Return the JSON schema dictionary for the wrapper
+    return TestCaseList.model_json_schema()
 
 
 def extract_use_cases(pdf_path):
@@ -138,73 +144,122 @@ def generate_test_case(
     collection=Depends(get_rag_collection),
     session: Session = Depends(get_db_session),  # <--- Inject Database Session
 ):
-    # 1. Verify Chat Exists
+    # 1. Verify Chat & Save User Message (Same as before)
+    # 1. Verify Chat & User
     chat = session.get(Chat, query.chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat session not found")
 
-    # 2. Save User Message to SQLite
+    user = session.get(User, chat.user_id)
+
     user_msg = Message(chat_id=query.chat_id, role="user", content=query.text)
     session.add(user_msg)
     session.commit()
 
-    # 3. RAG Retrieval (Convert integer ID to string for ChromaDB metadata filtering)
+    # 2. RAG Retrieval (Same as before - happens locally regardless of LLM choice)
     query_vec_resp = embedder.create_embedding(query.text)
     query_vec = query_vec_resp["data"][0]["embedding"]
 
     results = collection.query(
-        query_embeddings=[query_vec],
-        n_results=3,
-        where={
-            "chat_id": str(query.chat_id)
-        },  # ChromaDB requires string/int/float values
+        query_embeddings=[query_vec], n_results=3, where={"chat_id": str(query.chat_id)}
     )
 
-    # 4. Build Schema & Inference
-
-    if not results["documents"] or not results["documents"][0]:
-        context_text = "No context found. Rely on general QA best practices."
+    if results["documents"] and results["documents"][0]:
+        context_text = results["documents"][0]
     else:
-        context_text = "\n\n".join(results["documents"][0])
+        context_text = (
+            "No specific documentation provided. Rely on general QA best practices."
+        )
 
     dynamic_schema = build_dynamic_json_schema(query.columns)
 
-    output = llm.create_chat_completion(
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a top software tester. Your sole task is to generate a JSON array of test cases based on a given requirement. Consider edge cases and negative cases. Each case, unless told otherwise, must have the following keys: 'id' (if not specified, start as 'TC-001'), 'scenario', 'prerequisites', 'steps', 'data' in array or null, 'expected' in array, 'actual' null, 'status' null. Only output a single JSON object in 'cases' array. Texts in test cases must be concise.\n\nExample:\n{\"id\":\"TC-001\",\"scenario\":\"Verify theme toggle to Dark Mode\",\"prerequisites\":[\"App is in default Light Mode\"],\"steps\":[\"Navigate to Appearance Settings\",\"Click the 'Dark Mode' toggle\"],\"data\":null,\"expected\":[\"UI background changes to dark hex colors\",\"Text colors switch to light contrast\",\"Preference persists after refresh\"],\"actual\":null,\"status\":null}",
-            },
-            {
-                "role": "user",
-                "content": f"Documentation Context:\n{context_text}\n--END OF CONTEXT--\n\nGenerate test cases for the following requirement: {query.text}",
-            },
-        ],
-        response_format={"type": "json_object", "schema": dynamic_schema},
-        temperature=0.1,
-        max_tokens=2048,
-    )
+    messages = [
+        {
+            "role": "system",
+            "content": 'You are a top software tester. Your sole task is to generate a JSON array of test cases based on a given requirement. Consider edge cases and negative cases. Each case, unless told otherwise, must have the following keys: \'id\' (if not specified, start as \'TC-001\'), \'scenario\', \'prerequisites\', \'steps\', \'data\' in array or null, \'expected\' in array, \'actual\' null, \'status\' null. Only output a single JSON object in \'cases\' array. Texts in test cases must be concise.\n\nExample:\n{"id":"TC-001","scenario":"Verify theme toggle to Dark Mode","prerequisites":["App is in default Light Mode"],"steps":["Navigate to Appearance Settings","Click the \'Dark Mode\' toggle"],"data":null,"expected":["UI background changes to dark hex colors","Text colors switch to light contrast","Preference persists after refresh"],"actual":null,"status":null}\nNEVER use placeholders, generic text, or abbreviations like \'e.g.\', \'etc.\', or \'i.e.\'',
+        },
+        {
+            "role": "user",
+            "content": f"Documentation Context:\n{context_text}\n--END OF CONTEXT--\n\nGenerate test cases for the following requirement: {query.text}",
+        },
+    ]
 
-    raw_json_string = output["choices"][0]["message"]["content"]
-
+    # 3. ROUTE THE INFERENCE REQUEST
     try:
+        if query.model_source == "huggingface":
+            # Check if user has saved a token
+            if not user.hf_token:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Hugging Face token not found. Please add it in your Profile settings.",
+                )
+
+            # Use the token from the database
+            # --- CALL DEPLOYED MODEL ---
+            headers = {
+                "Authorization": f"Bearer {user.hf_token}",
+                "Content-Type": "application/json",
+            }
+
+            # Note: We enforce JSON output in the prompt if HF TGI doesn't support strict schema mapping
+            # messages[0][
+            #     "content"
+            # ] += "\n\nKeys specified. Output ONLY valid JSON matching this schema: " + json.dumps(
+            #     dynamic_schema
+            # )
+
+            payload = {
+                "inputs": {
+                    "target_model": "test_case",  # Routes to Qwen3-4B-Instruct
+                    "messages": messages,
+                    "temperature": 0.1,
+                    "max_tokens": 2048,
+                    "response_format": {
+                        "type": "json_schema",
+                        "schema": dynamic_schema,
+                    }
+                }
+            }
+
+            response = requests.post(HF_API_URL, headers=headers, json=payload)
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=502, detail=f"Hugging Face API Error: {response.text}"
+                )
+
+            hf_data = response.json()
+            raw_json_string = hf_data["choices"][0]["message"]["content"]
+
+        else:
+            # --- CALL LOCAL MODEL ---
+            output = llm.create_chat_completion(
+                messages=messages,
+                response_format={"type": "json_schema", "schema": dynamic_schema},
+                temperature=0.1,
+                max_tokens=2048,
+            )
+            raw_json_string = output["choices"][0]["message"]["content"]
+
+        # 4. Parse JSON and Save Response
         data = json.loads(raw_json_string)
 
-        # 5. Save AI Response to SQLite
         ai_msg = Message(
-            chat_id=query.chat_id,
-            role="assistant",
-            content=json.dumps(data),  # Save the JSON payload as a string
+            chat_id=query.chat_id, role="assistant", content=json.dumps(data)
         )
+
         session.add(ai_msg)
         session.commit()
 
         return data
 
     except json.JSONDecodeError:
+        print(f"Failed JSON Output: {raw_json_string}")
         raise HTTPException(
-            status_code=500, detail="Failed to parse structured output."
+            status_code=500, detail="The selected model failed to return valid JSON."
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/download")

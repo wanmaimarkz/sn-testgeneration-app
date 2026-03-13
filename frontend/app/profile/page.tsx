@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { User, Lock, ShieldCheck, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { User, Lock, ShieldCheck, Save, AlertCircle, CheckCircle2, KeyRound, Eye, EyeOff } from 'lucide-react';
 
 export default function ProfilePage() {
   // --- STATE ---
@@ -12,7 +12,11 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const [status, setStatus] = useState({ type: '', message: '' });
+  const [hfToken, setHfToken] = useState('');
+  const [initialHfToken, setInitialHfToken] = useState('');
+  const [showToken, setShowToken] = useState(false);
+
+  const [alertStatus, setAlertStatus] = useState({ type: '', message: '' });
   const [isLoading, setIsLoading] = useState(false);
 
   // --- INITIAL LOAD ---
@@ -30,6 +34,12 @@ export default function ProfilePage() {
           setUsername(userData.username);
           setInitialUsername(userData.username);
         }
+
+        if (userData.hf_token) {
+          setHfToken(userData.hf_token);
+          setInitialHfToken(userData.hf_token);
+        }
+
       } catch (e) {
         console.error("Failed to parse user data", e);
       }
@@ -39,10 +49,10 @@ export default function ProfilePage() {
   // --- FORM SUBMISSION ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus({ type: '', message: '' });
+    setAlertStatus({ type: '', message: '' });
 
     if (!userId) {
-      setStatus({ type: 'error', message: 'Error: User not logged in.' });
+      setAlertStatus({ type: 'error', message: 'Error: User not logged in.' });
       return;
     }
 
@@ -106,21 +116,48 @@ export default function ProfilePage() {
         updatedSomething = true;
       }
 
+      // 3. UPDATE HF TOKEN (Only if it changed)
+      if (hfToken !== initialHfToken) {
+        const res = await fetch('http://127.0.0.1:8000/api/profile/hf-token', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            hf_token: hfToken
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to update Hugging Face token');
+
+        // Update local storage so it persists on reload
+        const storedUserStr = localStorage.getItem('user');
+        if (storedUserStr) {
+          const userData = JSON.parse(storedUserStr);
+          userData.hf_token = hfToken;
+          localStorage.setItem('user', JSON.stringify(userData));
+        }
+
+        setInitialHfToken(hfToken);
+        updatedSomething = true;
+      }
+
+
       if (updatedSomething) {
-        setStatus({ type: 'success', message: 'Profile updated successfully!' });
+        setAlertStatus({ type: 'success', message: 'Profile updated successfully!' });
       } else {
-        setStatus({ type: 'error', message: 'No changes were made.' });
+        setAlertStatus({ type: 'error', message: 'No changes were made.' });
       }
 
     } catch (err: any) {
-      setStatus({ type: 'error', message: err.message });
+      setAlertStatus({ type: 'error', message: err.message });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className='h-full w-full overflow-y-auto custom-scrollbar bg-gray-100'>
+    <div className='h-full w-full overflow-y-auto custom-scrollbar bg-gray-100 rounded-2xl'>
       <div className="flex items-center justify-center min-h-full p-4 lg:p-12">
         <div className="bg-white rounded-4xl shadow-2xl shadow-black/10 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
 
@@ -138,24 +175,16 @@ export default function ProfilePage() {
           {/* Form Section */}
           <form onSubmit={handleSubmit} className="pt-20 p-8 lg:p-12 space-y-8">
             <div className="text-center mb-4">
-              <h1 className="text-2xl font-black text-gray-800 mt-5">Profile Settings</h1>
+              <h1 className="text-2xl font-black text-gray-800 mt-5">Profile Information</h1>
               <p className="text-gray-400 text-sm font-medium">Update your personal information below</p>
             </div>
-
-            {/* Status Alert Banner */}
-            {status.message && (
-              <div className={`p-3 rounded-2xl flex items-center gap-3 text-sm font-bold ${status.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                {status.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-                {status.message}
-              </div>
-            )}
 
             {/* Username Section */}
             <div className="grid grid-cols-1 gap-6">
               <div className="space-y-2">
                 <label className="text-xs font-black text-gray-500 uppercase tracking-widest ml-1">Username</label>
                 <div className="relative">
-                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <User size={21} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
                   <input
                     type="text"
                     value={username}
@@ -170,20 +199,20 @@ export default function ProfilePage() {
             {/* Password Section */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 text-blue-600">
-                <Lock size={18} />
+                <Lock size={21} />
                 <h3 className="text-sm font-bold">Security & Password</h3>
               </div>
 
-              <div className="p-5 bg-orange-50 rounded-3xl border border-orange-300 space-y-3">
-                <div className="flex items-center gap-2 text-orange-600">
-                  <ShieldCheck size={18} />
+              <div className="p-5 bg-purple-50 rounded-3xl border border-purple-300 space-y-3">
+                <div className="flex items-center gap-2 text-purple-600">
+                  <ShieldCheck size={21} />
                   <label className="text-xs font-black uppercase tracking-widest">Verify Current Password</label>
                 </div>
                 <input
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full px-5 py-3.5 bg-white border border-orange-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 text-gray-700"
+                  className="w-full px-5 py-3.5 bg-white border border-purple-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 text-gray-700"
                   placeholder="Required to change password"
                 />
               </div>
@@ -212,9 +241,57 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            <hr className="my-6 border-gray-300" />
+
+            <div className='space-y-4'>
+              {/* Header Section */}
+              <div className="relative h-36 bg-gradient-to-r from-yellow-600 to-orange-700 flex flex-col items-center justify-center text-white rounded-t-4xl">
+                <div className="relative group">
+                  <div className="w-24 h-24 bg-white rounded-3xl shadow-xl flex items-center justify-center border-4 border-white overflow-hidden">
+                    <KeyRound size={48} className="text-yellow-600" />
+                  </div>
+                </div>
+              </div>
+              <div className="text-center mb-4">
+                <h1 className="text-2xl font-black text-gray-800 mt-5">Hugging Face Token</h1>
+                <p className="text-gray-400 text-sm font-medium pt-1">Update your token below</p>
+              </div>
+
+              {/* Token Section */}
+              <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest ml-1">Token</label>
+                  <div className="relative">
+                    <KeyRound size={21} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      type={showToken ? 'text' : 'password'}
+                      value={hfToken}
+                      onChange={(e) => setHfToken(e.target.value)}
+                      placeholder="hf_xxxxxxxxxxxxxxxxxxxxx"
+                      className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-400 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all text-gray-700 font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowToken(!showToken)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+                    >
+                      {showToken ? <EyeOff size={21} /> : <Eye size={21} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Status Alert Banner */}
+            {alertStatus.message && (
+              <div className={`p-3 rounded-2xl flex items-center gap-3 text-sm font-bold ${alertStatus.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                {alertStatus.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+                {alertStatus.message}
+              </div>
+            )}
+
             {/* Submit Button */}
             <button
-              type="submit"
               disabled={isLoading}
               className={`w-full py-4 text-white rounded-2xl font-black shadow-lg transition-all flex items-center justify-center gap-3 cursor-pointer
                 ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 hover:shadow-blue-300 active:scale-[0.98]'}`}

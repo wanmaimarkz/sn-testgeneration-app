@@ -19,6 +19,10 @@ class PasswordUpdate(BaseModel):
     current_password: str
     new_password: str
 
+class HFTokenUpdate(BaseModel):
+    user_id: int
+    hf_token: str
+
 
 # --- ENDPOINTS ---
 
@@ -67,3 +71,15 @@ def change_password(data: PasswordUpdate, session: Session = Depends(get_db_sess
     session.commit()
 
     return {"message": "Password updated successfully"}
+
+@router.patch("/hf-token")
+def update_hf_token(data: HFTokenUpdate, session: Session = Depends(get_db_session)):
+    user = session.get(User, data.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.hf_token = data.hf_token
+    session.add(user)
+    session.commit()
+    
+    return {"message": "Hugging Face token saved successfully"}

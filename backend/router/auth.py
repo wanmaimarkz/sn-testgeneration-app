@@ -46,8 +46,13 @@ def login(user_data: UserAuth, session: Session = Depends(get_db_session)):
     user = session.exec(statement).first()
 
     if not user or not bcrypt.checkpw(
-        user_data.password.encode(), user.hashed_password
+        user_data.password.encode(), user.hashed_password.encode()
     ):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return {"message": "Login successful", "user_id": user.id, "username": user.username}
+    return {
+        "message": "Login successful",
+        "user_id": user.id,
+        "username": user.username,
+        "hf_token": user.hf_token
+    }
