@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from dependency import get_db_session
 from model import User
 
-router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 class UserAuth(BaseModel):

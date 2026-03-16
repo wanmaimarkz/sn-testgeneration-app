@@ -5,7 +5,7 @@ from dependency import get_db_session
 from model import User
 import bcrypt
 
-router = APIRouter(prefix="/api/profile", tags=["Profile"])
+router = APIRouter(prefix="/profile", tags=["Profile"])
 
 
 # --- SCHEMAS ---

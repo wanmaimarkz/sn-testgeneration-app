@@ -14,7 +14,7 @@ from model import Chat, Message, Folder, User
 from sqlmodel import Session, select
 import requests
 
-router = APIRouter(prefix="/api/chat", tags=["Chat"])
+router = APIRouter(prefix="/chat", tags=["Chat"])
 
 HF_API_URL = "https://z7zxrhb7h2wgz7uj.us-east-1.aws.endpoints.huggingface.cloud"
 
@@ -25,21 +25,6 @@ class UserQuery(BaseModel):
     chat_id: int
     columns: List[str]
     model_source: str = "local"
-
-
-class TestCaseResponse(BaseModel):
-    id: str
-    scenario: str
-    prerequisites: List[str]
-    steps: List[str]
-    data: List[str]
-    expected: List[str]
-    actual: Optional[str] = None
-    status: Optional[str] = None
-
-
-class ExportRequest(BaseModel):
-    test_cases: List[TestCaseResponse]
 
 
 class ChatMove(BaseModel):
@@ -61,18 +46,24 @@ def build_dynamic_json_schema(columns: List[str]) -> dict:
     fields = {}
     list_columns = ["prerequisites", "steps", "data", "expected"]
     
+    # Define which columns the LLM is actually allowed to generate content for
+    generatable_columns = ["id", "scenario", "prerequisites", "steps", "data", "expected"]
+
     for col in columns:
         if col in list_columns:
             fields[col] = (List[str], ...)
-        else:
+        elif col in generatable_columns:
             fields[col] = (str, ...)
-            
+        else:
+            # Force 'actual', 'status', and any other custom column to be strictly null
+            fields[col] = (type(None), None)
+
     # 1. Create the schema for a SINGLE test case
-    SingleTestCase = create_model('SingleTestCase', **fields)
-    
+    SingleTestCase = create_model("SingleTestCase", **fields)
+
     # 2. Create a WRAPPER schema that holds a LIST of single test cases
-    TestCaseList = create_model('TestCaseList', cases=(List[SingleTestCase], ...))
-    
+    TestCaseList = create_model("TestCaseList", cases=(List[SingleTestCase], ...))
+
     # Return the JSON schema dictionary for the wrapper
     return TestCaseList.model_json_schema()
 
@@ -176,12 +167,12 @@ def generate_test_case(
     messages = [
         {
             "role": "system",
-            "content": 'You are a top software tester. Your sole task is to generate a JSON array of test cases based on a given requirement. Consider edge cases and negative cases. Each case, unless told otherwise, must have the following keys: \'id\' (if not specified, start as \'TC-001\'), \'scenario\', \'prerequisites\', \'steps\', \'data\' in array or null, \'expected\' in array, \'actual\' null, \'status\' null. Only output a single JSON object in \'cases\' array. Texts in test cases must be concise.\n\nExample:\n{"id":"TC-001","scenario":"Verify theme toggle to Dark Mode","prerequisites":["App is in default Light Mode"],"steps":["Navigate to Appearance Settings","Click the \'Dark Mode\' toggle"],"data":null,"expected":["UI background changes to dark hex colors","Text colors switch to light contrast","Preference persists after refresh"],"actual":null,"status":null}\nNEVER use placeholders, generic text, or abbreviations like \'e.g.\', \'etc.\', or \'i.e.\'',
+            "content": f"<|im_start|>system\nYou are a test case generator. You are to only generate a JSON array of test cases based on a given requirement according to best practices. Consider edge cases and negative cases when possible. Each case must have the following keys: {query.columns}. Keep text in test cases concise and imperative. Output your answer in 'cases' array.\n\nDocumentation Context:\n{context_text}<|im_end|>",
         },
         {
             "role": "user",
-            "content": f"Documentation Context:\n{context_text}\n--END OF CONTEXT--\n\nGenerate test cases for the following requirement: {query.text}",
-        },
+            "content": f"<|im_start|>user\nGenerate test cases for the following requirement: {query.text}<|im_end|>",
+        }
     ]
 
     # 3. ROUTE THE INFERENCE REQUEST
@@ -213,11 +204,13 @@ def generate_test_case(
                     "target_model": "test_case",  # Routes to Qwen3-4B-Instruct
                     "messages": messages,
                     "temperature": 0.1,
-                    "max_tokens": 2048,
+                    "max_tokens": 1024,
+                    "repeat_penalty": 1.05,
                     "response_format": {
                         "type": "json_schema",
                         "schema": dynamic_schema,
-                    }
+                    },
+                    "stop": ["<|im_end|>"]
                 }
             }
 
@@ -237,12 +230,22 @@ def generate_test_case(
                 messages=messages,
                 response_format={"type": "json_schema", "schema": dynamic_schema},
                 temperature=0.1,
-                max_tokens=2048,
+                max_tokens=1024,
+                repeat_penalty=1.05,
+                stop=["<|im_end|>"]
             )
             raw_json_string = output["choices"][0]["message"]["content"]
 
         # 4. Parse JSON and Save Response
         data = json.loads(raw_json_string)
+
+        test_cases_array = data.get("cases", [])
+        
+        # Post-processing: Inject the null columns
+        for case in test_cases_array:
+            for col in query.columns:
+                if col not in case:
+                    case[col] = None
 
         ai_msg = Message(
             chat_id=query.chat_id, role="assistant", content=json.dumps(data)
