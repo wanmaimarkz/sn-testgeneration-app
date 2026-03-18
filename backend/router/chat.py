@@ -147,6 +147,7 @@ def generate_test_case(
     user_msg = Message(chat_id=query.chat_id, role="user", content=query.text)
     session.add(user_msg)
     session.commit()
+    print(query)
 
     # 2. RAG Retrieval (Same as before - happens locally regardless of LLM choice)
     query_vec_resp = embedder.create_embedding(query.text)

@@ -419,8 +419,8 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
         api.getChats(userId),
         api.getFolders(userId),
       ]);
-      setChats(fetchedChats);
-      setFolders(fetchedFolders);
+      setChats(Array.isArray(fetchedChats) ? fetchedChats : []);
+      setFolders(Array.isArray(fetchedFolders) ? fetchedFolders : []);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         setError('Connection timed out — is the server running?');
@@ -507,7 +507,7 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
     return () => window.removeEventListener('chat:created', handler);
   }, [fetchData]);
 
-  const unassignedChats = chats.filter(c => c.folder_id === null);
+  const unassignedChats = (chats ?? []).filter(c => c.folder_id === null);
 
   return (
     <aside
@@ -570,7 +570,7 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
         {!loading && !error && (
           <div className="space-y-1 pb-8">
             {/* Folder sections */}
-            {folders.map(folder => (
+            {(folders ?? []).map(folder => (
               <FolderSection
                 key={folder.id}
                 folder={folder}
