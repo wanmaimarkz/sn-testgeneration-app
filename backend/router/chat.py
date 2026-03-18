@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/chat", tags=["Chat"])
 class UserQuery(BaseModel):
     text: str
     chat_id: int
+    # chat_id: str
     columns: List[str]
 
 

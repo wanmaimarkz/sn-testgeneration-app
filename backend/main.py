@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     print("8 Loading LLM into RAM...")
     dependency.llm_model = Llama(
         model_path="local/Qwen3-4B-Instruct-2507.Q8_0.gguf", # Update filename if needed
-        n_ctx=32768,
+        n_ctx=16384,
         n_gpu_layers=-1, # Offload to GPU
         verbose=False
     )
@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     # 4. Load Vector DB
     print("8 Connecting to ChromaDB...")
     client = chromadb.PersistentClient(path="database/vector")
-    dependency.chroma_collection = client.get_collection("use_case_knowledge")
+    dependency.chroma_collection = client.get_or_create_collection("use_case_knowledge")
     
     print("1 System Ready!")
     yield

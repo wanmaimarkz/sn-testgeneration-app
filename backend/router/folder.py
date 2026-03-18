@@ -18,6 +18,13 @@ class FolderRename(BaseModel):
 
 @router.post("/")
 def create_folder(folder_in: FolderCreate, session: Session = Depends(get_db_session)):
+    # Check if folder name already exists for this user
+    existing = session.exec(
+        select(Folder).where(Folder.user_id == folder_in.user_id, Folder.name == folder_in.name)
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Folder '{folder_in.name}' already exists")
+ 
     db_folder = Folder(name=folder_in.name, user_id=folder_in.user_id)
     session.add(db_folder)
     session.commit()
@@ -86,3 +93,14 @@ def rename_folder(
         "folder_id": folder.id,
         "new_name": folder.name,
     }
+
+@router.get("/user/{user_id}")
+def get_user_folders(user_id: int, session: Session = Depends(get_db_session)):
+    """
+    Fetches all folders for a specific user, ordered by creation date.
+    """
+    # Query folders belonging to this user
+    statement = select(Folder).where(Folder.user_id == user_id).order_by(Folder.created_at.asc())
+    folders = session.exec(statement).all()
+
+    return folders

@@ -48,7 +48,10 @@ export default function LoginPage() {
       // Login สำเร็จ: เก็บข้อมูลผู้ใช้และไปหน้า Dashboard
       if (response.ok) {
         // บันทึกใน LocalStorage ตามเดิมสำหรับใช้งานในหน้าเว็บ
-        localStorage.setItem('user', JSON.stringify(data));
+        localStorage.setItem('user', JSON.stringify({
+          id: data.user_id,       // map user_id → id ให้ตรงกับที่ layout.tsx อ่าน
+          username: data.username,
+        }));
 
         document.cookie = "isLoggedIn=true; path=/; max-age=86400"; // อยู่ได้ 1 วัน
 
