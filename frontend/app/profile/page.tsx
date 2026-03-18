@@ -74,6 +74,46 @@ export default function ProfilePage() {
         if (!res.ok) throw new Error(data.detail || 'Failed to update password');
         setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); updatedSomething = true;
       }
+
+      // 3. UPDATE HF TOKEN (Only if it changed)
+      if (hfToken !== initialHfToken) {
+        const res = await fetch('http://127.0.0.1:8000/api/profile/hf-token', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            hf_token: hfToken
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to update Hugging Face token');
+
+        // Update local storage so it persists on reload
+        const storedUserStr = localStorage.getItem('user');
+        if (storedUserStr) {
+          const userData = JSON.parse(storedUserStr);
+          userData.hf_token = hfToken;
+          localStorage.setItem('user', JSON.stringify(userData));
+        }
+
+        setInitialHfToken(hfToken);
+        updatedSomething = true;
+      }
+
+
+      if (updatedSomething) {
+        setAlertStatus({ type: 'success', message: 'Profile updated successfully!' });
+      } else {
+        setAlertStatus({ type: 'error', message: 'No changes were made.' });
+      }
+
+    } catch (err: any) {
+      setAlertStatus({ type: 'error', message: err.message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
       if (updatedSomething) { setStatus({ type: 'success', message: 'Profile updated successfully!' }); }
       else { setStatus({ type: 'error', message: 'No changes were made.' }); }
     } catch (err: any) { setStatus({ type: 'error', message: err.message }); }
@@ -215,6 +255,11 @@ export default function ProfilePage() {
                 <div>
                   <h2 className="text-base font-black text-gray-800 mb-1">Change Password</h2>
                   <p className="text-xs text-gray-400 font-medium">ต้องใส่รหัสปัจจุบันก่อนเปลี่ยน</p>
+
+              <div className="p-5 bg-purple-50 rounded-3xl border border-purple-300 space-y-3">
+                <div className="flex items-center gap-2 text-purple-600">
+                  <ShieldCheck size={21} />
+                  <label className="text-xs font-black uppercase tracking-widest">Verify Current Password</label>
                 </div>
                 <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl space-y-3">
                   <div className="flex items-center gap-2">

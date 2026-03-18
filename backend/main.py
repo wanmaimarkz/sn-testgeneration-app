@@ -17,8 +17,8 @@ async def lifespan(app: FastAPI):
     # 2. Load LLM (The 4B model)
     print("8 Loading LLM into RAM...")
     dependency.llm_model = Llama(
-        model_path="local/Qwen3-4B-Instruct-2507.Q8_0.gguf", # Update filename if needed
-        n_ctx=16384,
+        model_path="local/qwen3-4b-instruct-2507.Q8_0.gguf", # Update filename if needed
+        n_ctx=8192,
         n_gpu_layers=-1, # Offload to GPU
         verbose=False
     )
@@ -27,12 +27,12 @@ async def lifespan(app: FastAPI):
     print("8 Loading Embedding Model into RAM...")
     dependency.embed_model = Llama(
         model_path="local/Qwen3-Embedding-4B-Q8_0.gguf", # Must match ingest.py model
-        n_ctx=16384,
+        n_ctx=8192,
         embedding=True, # <--- CRITICAL FLAG
         verbose=False,
         n_gpu_layers=-1
     )
-    
+
     # 4. Load Vector DB
     print("8 Connecting to ChromaDB...")
     client = chromadb.PersistentClient(path="database/vector")
@@ -52,10 +52,10 @@ app.add_middleware(
     allow_headers=["*"], # อนุญาตทุก Headers
 )
 
-app.include_router(auth.router)
-app.include_router(chat.router)
-app.include_router(folder.router)
-app.include_router(profile.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
+app.include_router(folder.router, prefix="/api")
+app.include_router(profile.router, prefix="/api")
 
 # --- HEALTH CHECK ---
 @app.get("/")

@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from dependency import get_db_session
 from model import User
 
-router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 class UserAuth(BaseModel):
@@ -51,4 +51,9 @@ def login(user_data: UserAuth, session: Session = Depends(get_db_session)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     print(user.id)
 
-    return {"message": "Login successful", "user_id": user.id, "username": user.username}
+    return {
+        "message": "Login successful",
+        "user_id": user.id,
+        "username": user.username,
+        "hf_token": user.hf_token
+    }
