@@ -73,6 +73,14 @@ const MODELS: { id: ModelType; label: string; desc: string; badge: string; badge
 export default function TestCasePage() {
   const [selectedModel, setSelectedModel] = useState<ModelType>('local');
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [noHfKeyWarning, setNoHfKeyWarning] = useState(false);
+
+  // อ่าน HF key จาก localStorage (บันทึกจากหน้า Profile)
+  const [hasHfKey, setHasHfKey] = useState(false);
+  useEffect(() => {
+    const key = localStorage.getItem('hf_key');
+    setHasHfKey(!!key && key.startsWith('hf_'));
+  }, []);
   const [messages, setMessages] = useState<{
     id: string,
     role: string,
@@ -233,7 +241,7 @@ export default function TestCasePage() {
         const chatRes = await fetch('http://127.0.0.1:8000/api/chat/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: currentInput.slice(0, 50), user_id: userId }),
+          body: JSON.stringify({ title: currentInput.slice(0, 50), user_id: userId }),
         });
         const newChat = await chatRes.json();
         activeChatId = newChat.id;
@@ -327,35 +335,62 @@ export default function TestCasePage() {
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 pt-3 pb-2">
                 Select Model
               </p>
-              {MODELS.map(model => (
-                <button
-                  key={model.id}
-                  type="button"
-                  onClick={() => { setSelectedModel(model.id); setShowModelPicker(false); }}
-                  className={`w-full text-left px-4 py-3.5 rounded-2xl transition-all flex items-start justify-between gap-3 group
-                    ${selectedModel === model.id ? 'bg-gray-700' : 'hover:bg-gray-800'}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 p-1.5 rounded-lg ${selectedModel === model.id ? 'bg-white/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
-                      {model.id === 'local' ? <Cpu size={14} className="text-white" /> : <Cloud size={14} className="text-white" />}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-white font-bold text-sm">{model.label}</span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${model.badgeColor}`}>
-                          {model.badge}
-                        </span>
+
+              {/* No HF Key Warning */}
+              {noHfKeyWarning && (
+                <div className="mx-2 mb-2 px-3 py-2.5 bg-red-500/20 border border-red-500/40 rounded-xl flex items-center gap-2 animate-in fade-in">
+                  <span className="text-red-400 text-xs font-bold">⚠️ ต้องเพิ่ม HuggingFace API Key ก่อน ไปที่ Profile Settings</span>
+                </div>
+              )}
+
+              {MODELS.map(model => {
+                const isDisabled = model.id === 'cloud' && !hasHfKey;
+                return (
+                  <button
+                    key={model.id}
+                    type="button"
+                    onClick={() => {
+                      if (isDisabled) {
+                        setNoHfKeyWarning(true);
+                        setTimeout(() => setNoHfKeyWarning(false), 3500);
+                        return;
+                      }
+                      setSelectedModel(model.id);
+                      setShowModelPicker(false);
+                    }}
+                    className={`w-full text-left px-4 py-3.5 rounded-2xl transition-all flex items-start justify-between gap-3 group
+                      ${isDisabled ? 'opacity-40 cursor-not-allowed' : selectedModel === model.id ? 'bg-gray-700' : 'hover:bg-gray-800'}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-0.5 p-1.5 rounded-lg ${selectedModel === model.id ? 'bg-white/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
+                        {model.id === 'local' ? <Cpu size={14} className="text-white" /> : <Cloud size={14} className="text-white" />}
                       </div>
-                      <p className="text-gray-400 text-xs leading-snug">{model.desc}</p>
+                      <div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-white font-bold text-sm">{model.label}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${model.badgeColor}`}>
+                            {model.badge}
+                          </span>
+                          {isDisabled && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-900/50 text-red-400">
+                              No Key
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-400 text-xs leading-snug">{model.desc}</p>
+                        {isDisabled && (
+                          <p className="text-red-400 text-[10px] mt-0.5">ต้องตั้งค่า HF Key ใน Profile ก่อน</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  {selectedModel === model.id && (
-                    <div className="shrink-0 mt-1 w-5 h-5 rounded-full bg-white flex items-center justify-center">
-                      <Check size={11} className="text-gray-900" />
-                    </div>
-                  )}
-                </button>
-              ))}
+                    {selectedModel === model.id && !isDisabled && (
+                      <div className="shrink-0 mt-1 w-5 h-5 rounded-full bg-white flex items-center justify-center">
+                        <Check size={11} className="text-gray-900" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
               <div className="px-4 py-3 border-t border-gray-700 mt-1">
                 <p className="text-[10px] text-gray-500 leading-relaxed">
                   {selectedModel === 'local'
