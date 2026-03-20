@@ -49,6 +49,7 @@ def login(user_data: UserAuth, session: Session = Depends(get_db_session)):
         user_data.password.encode(), user.hashed_password.encode()
     ):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    print(user.id)
 
     return {
         "message": "Login successful",

@@ -32,7 +32,7 @@ class Folder(SQLModel, table=True):
 # --- 3. Chat Session Model ---
 class Chat(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    title: str = Field(default="New Chat")
+    name: str = Field(default="New Chat")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Foreign Keys

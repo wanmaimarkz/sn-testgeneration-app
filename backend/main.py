@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     # 4. Load Vector DB
     print("8 Connecting to ChromaDB...")
     client = chromadb.PersistentClient(path="database/vector")
-    dependency.chroma_collection = client.get_collection("use_case_knowledge")
+    dependency.chroma_collection = client.get_or_create_collection("use_case_knowledge")
     
     print("1 System Ready!")
     yield

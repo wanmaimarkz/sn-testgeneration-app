@@ -23,6 +23,7 @@ HF_API_URL = "https://z7zxrhb7h2wgz7uj.us-east-1.aws.endpoints.huggingface.cloud
 class UserQuery(BaseModel):
     text: str
     chat_id: int
+    # chat_id: str
     columns: List[str]
     model_source: str = "local"
 
@@ -146,6 +147,7 @@ def generate_test_case(
     user_msg = Message(chat_id=query.chat_id, role="user", content=query.text)
     session.add(user_msg)
     session.commit()
+    print(query)
 
     # 2. RAG Retrieval (Same as before - happens locally regardless of LLM choice)
     query_vec_resp = embedder.create_embedding(query.text)

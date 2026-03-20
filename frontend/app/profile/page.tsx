@@ -1,307 +1,350 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { User, Lock, ShieldCheck, Save, AlertCircle, CheckCircle2, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, ShieldCheck, Save, AlertCircle, CheckCircle2, Key, Eye, EyeOff, Check, Trash2 } from 'lucide-react';
 
 export default function ProfilePage() {
-  // --- STATE ---
   const [userId, setUserId] = useState<number | null>(null);
   const [username, setUsername] = useState('');
-  const [initialUsername, setInitialUsername] = useState(''); // Track to know if it changed
-
+  const [initialUsername, setInitialUsername] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
-  const [hfToken, setHfToken] = useState('');
-  const [initialHfToken, setInitialHfToken] = useState('');
-  const [showToken, setShowToken] = useState(false);
-
-  const [alertStatus, setAlertStatus] = useState({ type: '', message: '' });
+  const [hfKey, setHfKey] = useState('');
+  const [showHfKey, setShowHfKey] = useState(false);
+  const [hfKeySaved, setHfKeySaved] = useState(false);
+  const [hfKeyStatus, setHfKeyStatus] = useState<{ type: string; message: string }>({ type: '', message: '' });
+  const [status, setStatus] = useState({ type: '', message: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState<'account' | 'security' | 'api'>('account');
 
-  // --- INITIAL LOAD ---
   useEffect(() => {
-    // Parse the JSON object from local storage
     const storedUserStr = localStorage.getItem('user');
-
     if (storedUserStr) {
       try {
         const userData = JSON.parse(storedUserStr);
-        // Handle variations of the ID key (user_id or id) depending on your API
-        if (userData.user_id) setUserId(userData.user_id);
-
-        if (userData.username) {
-          setUsername(userData.username);
-          setInitialUsername(userData.username);
-        }
-
-        if (userData.hf_token) {
-          setHfToken(userData.hf_token);
-          setInitialHfToken(userData.hf_token);
-        }
-
-      } catch (e) {
-        console.error("Failed to parse user data", e);
-      }
+        if (userData.id) setUserId(userData.id);
+        if (userData.username) { setUsername(userData.username); setInitialUsername(userData.username); }
+      } catch (e) { console.error("Failed to parse user data", e); }
     }
+    const savedKey = localStorage.getItem('hf_key');
+    if (savedKey) { setHfKey(savedKey); setHfKeySaved(true); }
   }, []);
 
-  // --- FORM SUBMISSION ---
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAlertStatus({ type: '', message: '' });
-
-    if (!userId) {
-      setAlertStatus({ type: 'error', message: 'Error: User not logged in.' });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      let updatedSomething = false;
-
-      // 1. UPDATE USERNAME (Only if it changed)
-      if (username && username !== initialUsername) {
-        const res = await fetch('http://127.0.0.1:8000/api/profile/username', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: userId,
-            new_username: username
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Failed to update username');
-
-        // Retrieve the current user object, update the username, and save it back
-        const storedUserStr = localStorage.getItem('user');
-        if (storedUserStr) {
-          const userData = JSON.parse(storedUserStr);
-          userData.username = data.new_username;
-          localStorage.setItem('user', JSON.stringify(userData));
-        }
-
-        setInitialUsername(data.new_username);
-        updatedSomething = true;
-      }
-
-      // 2. UPDATE PASSWORD (Only if fields are filled out)
-      if (currentPassword || newPassword || confirmPassword) {
-        if (newPassword !== confirmPassword) {
-          throw new Error("New passwords do not match.");
-        }
-        if (!currentPassword) {
-          throw new Error("Current password is required to set a new password.");
-        }
-
-        const res = await fetch('http://127.0.0.1:8000/api/profile/password', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: userId,
-            current_password: currentPassword,
-            new_password: newPassword
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Failed to update password');
-
-        // Clear password fields on success
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        updatedSomething = true;
-      }
-
-      // 3. UPDATE HF TOKEN (Only if it changed)
-      if (hfToken !== initialHfToken) {
-        const res = await fetch('http://127.0.0.1:8000/api/profile/hf-token', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: userId,
-            hf_token: hfToken
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Failed to update Hugging Face token');
-
-        // Update local storage so it persists on reload
-        const storedUserStr = localStorage.getItem('user');
-        if (storedUserStr) {
-          const userData = JSON.parse(storedUserStr);
-          userData.hf_token = hfToken;
-          localStorage.setItem('user', JSON.stringify(userData));
-        }
-
-        setInitialHfToken(hfToken);
-        updatedSomething = true;
-      }
-
-
-      if (updatedSomething) {
-        setAlertStatus({ type: 'success', message: 'Profile updated successfully!' });
-      } else {
-        setAlertStatus({ type: 'error', message: 'No changes were made.' });
-      }
-
-    } catch (err: any) {
-      setAlertStatus({ type: 'error', message: err.message });
-    } finally {
-      setIsLoading(false);
-    }
+  const handleSaveHfKey = () => {
+    const trimmed = hfKey.trim();
+    if (!trimmed) { setHfKeyStatus({ type: 'error', message: 'กรุณากรอก HuggingFace API Key' }); return; }
+    if (!trimmed.startsWith('hf_')) { setHfKeyStatus({ type: 'error', message: 'Key ต้องเริ่มต้นด้วย hf_' }); return; }
+    localStorage.setItem('hf_key', trimmed);
+    setHfKeySaved(true);
+    setHfKeyStatus({ type: 'success', message: 'บันทึก HuggingFace Key สำเร็จ' });
+    setTimeout(() => setHfKeyStatus({ type: '', message: '' }), 3000);
   };
 
-  return (
-    <div className='h-full w-full overflow-y-auto custom-scrollbar bg-gray-100 rounded-2xl'>
-      <div className="flex items-center justify-center min-h-full p-4 lg:p-12">
-        <div className="bg-white rounded-4xl shadow-2xl shadow-black/10 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+  const handleRemoveHfKey = () => {
+    localStorage.removeItem('hf_key');
+    setHfKey(''); setHfKeySaved(false); setHfKeyStatus({ type: '', message: '' });
+  };
 
-          {/* Header Section */}
-          <div className="relative h-44 bg-gradient-to-r from-blue-600 to-indigo-700 flex flex-col items-center justify-center text-white">
-            <div className="absolute -bottom-12">
-              <div className="relative group">
-                <div className="w-24 h-24 bg-white rounded-3xl shadow-xl flex items-center justify-center border-4 border-white overflow-hidden">
-                  <User size={48} className="text-blue-600" />
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus({ type: '', message: '' });
+    if (!userId) { setStatus({ type: 'error', message: 'Error: User not logged in.' }); return; }
+    setIsLoading(true);
+    try {
+      let updatedSomething = false;
+      if (username && username !== initialUsername) {
+        const res = await fetch('http://127.0.0.1:8000/api/profile/username', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, new_username: username })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to update username');
+        const storedUserStr = localStorage.getItem('user');
+        if (storedUserStr) { const userData = JSON.parse(storedUserStr); userData.username = data.new_username; localStorage.setItem('user', JSON.stringify(userData)); }
+        setInitialUsername(data.new_username); updatedSomething = true;
+      }
+      if (currentPassword || newPassword || confirmPassword) {
+        if (newPassword !== confirmPassword) throw new Error("New passwords do not match.");
+        if (!currentPassword) throw new Error("Current password is required.");
+        const res = await fetch('http://127.0.0.1:8000/api/profile/password', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, current_password: currentPassword, new_password: newPassword })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to update password');
+        setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); updatedSomething = true;
+      }
+      if (updatedSomething) { setStatus({ type: 'success', message: 'Profile updated successfully!' }); }
+      else { setStatus({ type: 'error', message: 'No changes were made.' }); }
+    } catch (err: any) { setStatus({ type: 'error', message: err.message }); }
+    finally { setIsLoading(false); }
+  };
+
+  const maskedKey = hfKey.length > 8
+    ? `${hfKey.slice(0, 5)}${'•'.repeat(Math.min(hfKey.length - 8, 20))}${hfKey.slice(-3)}`
+    : hfKey;
+
+  const initials = username ? username.slice(0, 2).toUpperCase() : '??';
+
+  const tabs = [
+    { id: 'account', label: 'Account', icon: User },
+    { id: 'security', label: 'Security', icon: Lock },
+    { id: 'api', label: 'API Keys', icon: Key },
+  ] as const;
+
+  return (
+    <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 custom-scrollbar">
+      <div className="max-w-3xl mx-auto px-6 py-12">
+
+        {/* Hero Card */}
+        <div className="relative rounded-3xl overflow-hidden mb-8 shadow-xl shadow-blue-900/10">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800" />
+          <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/5" />
+          <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-white/5" />
+          <div className="absolute top-8 right-40 w-20 h-20 rounded-full bg-white/5" />
+
+          <div className="relative px-10 py-10 flex items-center gap-8">
+            <div className="relative shrink-0">
+              <div className="w-24 h-24 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-lg">
+                <span className="text-3xl font-black text-white tracking-tight">{initials}</span>
+              </div>
+              {hfKeySaved && (
+                <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-emerald-400 rounded-lg flex items-center justify-center shadow-md border-2 border-white">
+                  <Key size={12} className="text-white" />
                 </div>
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-black text-white tracking-tight truncate">{username || 'Loading...'}</h1>
+              <p className="text-blue-200 text-sm font-medium mt-1">User ID #{userId}</p>
+              <div className="flex items-center gap-3 mt-4 flex-wrap">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold ${hfKeySaved ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30' : 'bg-white/10 text-blue-200 border border-white/20'}`}>
+                  <Key size={10} />
+                  {hfKeySaved ? 'HF Key Connected' : 'No HF Key'}
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-white/10 text-blue-200 border border-white/20">
+                  <User size={10} />
+                  Active Account
+                </span>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Form Section */}
-          <form onSubmit={handleSubmit} className="pt-20 p-8 lg:p-12 space-y-8">
-            <div className="text-center mb-4">
-              <h1 className="text-2xl font-black text-gray-800 mt-5">Profile Information</h1>
-              <p className="text-gray-400 text-sm font-medium">Update your personal information below</p>
-            </div>
+        {/* Tab Nav */}
+        <div className="flex gap-1 p-1.5 bg-white rounded-2xl shadow-sm border border-gray-100 mb-6">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeSection === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => { setActiveSection(tab.id); setStatus({ type: '', message: '' }); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={15} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
 
-            {/* Username Section */}
-            <div className="grid grid-cols-1 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-black text-gray-500 uppercase tracking-widest ml-1">Username</label>
-                <div className="relative">
-                  <User size={21} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-400 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-gray-700 font-medium"
-                  />
-                </div>
-              </div>
-            </div>
+        {/* Status Banner */}
+        {status.message && (
+          <div className={`mb-5 px-5 py-4 rounded-2xl flex items-center gap-3 text-sm font-bold border ${
+            status.type === 'success'
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'bg-red-50 text-red-600 border-red-200'
+          }`}>
+            {status.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+            {status.message}
+          </div>
+        )}
 
-            {/* Password Section */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-2 text-blue-600">
-                <Lock size={21} />
-                <h3 className="text-sm font-bold">Security & Password</h3>
-              </div>
+        <form onSubmit={handleSubmit}>
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
 
-              <div className="p-5 bg-purple-50 rounded-3xl border border-purple-300 space-y-3">
-                <div className="flex items-center gap-2 text-purple-600">
-                  <ShieldCheck size={21} />
-                  <label className="text-xs font-black uppercase tracking-widest">Verify Current Password</label>
-                </div>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full px-5 py-3.5 bg-white border border-purple-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 text-gray-700"
-                  placeholder="Required to change password"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest ml-1">New Password</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-5 py-3.5 bg-gray-50 border border-gray-400 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-gray-700"
-                  />
+            {/* Account Tab */}
+            {activeSection === 'account' && (
+              <div className="p-8 space-y-6">
+                <div>
+                  <h2 className="text-base font-black text-gray-800 mb-1">Account Information</h2>
+                  <p className="text-xs text-gray-400 font-medium">Update your display name</p>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest ml-1">Confirm Password</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-5 py-3.5 bg-gray-50 border border-gray-400 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-gray-700"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <hr className="my-6 border-gray-300" />
-
-            <div className='space-y-4'>
-              {/* Header Section */}
-              <div className="relative h-36 bg-gradient-to-r from-yellow-600 to-orange-700 flex flex-col items-center justify-center text-white rounded-t-4xl">
-                <div className="relative group">
-                  <div className="w-24 h-24 bg-white rounded-3xl shadow-xl flex items-center justify-center border-4 border-white overflow-hidden">
-                    <KeyRound size={48} className="text-yellow-600" />
-                  </div>
-                </div>
-              </div>
-              <div className="text-center mb-4">
-                <h1 className="text-2xl font-black text-gray-800 mt-5">Hugging Face Token</h1>
-                <p className="text-gray-400 text-sm font-medium pt-1">Update your token below</p>
-              </div>
-
-              {/* Token Section */}
-              <div className="grid grid-cols-1 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest ml-1">Token</label>
+                  <label className="block text-xs font-black text-gray-500 uppercase tracking-widest">Username</label>
                   <div className="relative">
-                    <KeyRound size={21} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                      <User size={15} className="text-blue-500" />
+                    </div>
                     <input
-                      type={showToken ? 'text' : 'password'}
-                      value={hfToken}
-                      onChange={(e) => setHfToken(e.target.value)}
-                      placeholder="hf_xxxxxxxxxxxxxxxxxxxxx"
-                      className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-400 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all text-gray-700 font-medium"
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      required
+                      className="w-full pl-16 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-blue-300 transition-all text-gray-800 font-semibold text-sm"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowToken(!showToken)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
-                    >
-                      {showToken ? <EyeOff size={21} /> : <Eye size={21} />}
-                    </button>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Status Alert Banner */}
-            {alertStatus.message && (
-              <div className={`p-3 rounded-2xl flex items-center gap-3 text-sm font-bold ${alertStatus.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                {alertStatus.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-                {alertStatus.message}
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isLoading || username === initialUsername}
+                    className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl font-bold text-sm transition-all shadow-sm ${
+                      isLoading || username === initialUsername
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200 active:scale-[0.98]'
+                    }`}
+                  >
+                    <Save size={16} />
+                    {isLoading ? 'Saving...' : 'Save Username'}
+                  </button>
+                </div>
               </div>
             )}
 
-            {/* Submit Button */}
-            <button
-              disabled={isLoading}
-              className={`w-full py-4 text-white rounded-2xl font-black shadow-lg transition-all flex items-center justify-center gap-3 cursor-pointer
-                ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 hover:shadow-blue-300 active:scale-[0.98]'}`}
-            >
-              <Save size={20} />
-              {isLoading ? 'Saving...' : 'Save Changes'}
-            </button>
-          </form>
+            {/* Security Tab */}
+            {activeSection === 'security' && (
+              <div className="p-8 space-y-6">
+                <div>
+                  <h2 className="text-base font-black text-gray-800 mb-1">Change Password</h2>
+                  <p className="text-xs text-gray-400 font-medium">ต้องใส่รหัสปัจจุบันก่อนเปลี่ยน</p>
+                </div>
+                <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={15} className="text-amber-600" />
+                    <label className="text-xs font-black text-amber-700 uppercase tracking-widest">Current Password</label>
+                  </div>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full px-4 py-3.5 bg-white border border-amber-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-400 text-gray-700 text-sm font-medium"
+                    placeholder="Enter your current password"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { label: 'New Password', value: newPassword, onChange: setNewPassword },
+                    { label: 'Confirm Password', value: confirmPassword, onChange: setConfirmPassword },
+                  ].map(({ label, value, onChange }) => (
+                    <div key={label} className="space-y-2">
+                      <label className="block text-xs font-black text-gray-500 uppercase tracking-widest">{label}</label>
+                      <input
+                        type="password"
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-gray-700 text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+                {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                  <p className="text-xs font-bold text-red-500 flex items-center gap-1.5">
+                    <AlertCircle size={13} /> Passwords do not match
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
+                  className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl font-bold text-sm transition-all ${
+                    isLoading || !currentPassword || !newPassword || !confirmPassword
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-200 active:scale-[0.98]'
+                  }`}
+                >
+                  <Lock size={15} />
+                  {isLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            )}
 
-        </div>
+            {/* API Keys Tab */}
+            {activeSection === 'api' && (
+              <div className="p-8 space-y-6">
+                <div>
+                  <h2 className="text-base font-black text-gray-800 mb-1">HuggingFace API Key</h2>
+                  <p className="text-xs text-gray-400 font-medium">
+                    ใช้สำหรับ Cloud Model — รับ key ได้ที่{' '}
+                    <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 font-bold hover:underline">
+                      huggingface.co/settings/tokens
+                    </a>
+                  </p>
+                </div>
+
+                {hfKeyStatus.message && (
+                  <div className={`px-4 py-3 rounded-xl flex items-center gap-2.5 text-xs font-bold border ${
+                    hfKeyStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
+                  }`}>
+                    {hfKeyStatus.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                    {hfKeyStatus.message}
+                  </div>
+                )}
+
+                <div className={`flex items-center gap-3 px-5 py-4 rounded-2xl border ${hfKeySaved ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${hfKeySaved ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-bold ${hfKeySaved ? 'text-emerald-700' : 'text-gray-500'}`}>
+                      {hfKeySaved ? 'Key Connected' : 'No Key Set'}
+                    </p>
+                    {hfKeySaved && <p className="text-xs text-emerald-600 font-mono mt-0.5">{maskedKey}</p>}
+                  </div>
+                  {hfKeySaved && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveHfKey}
+                      className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-600 transition-colors px-3 py-1.5 hover:bg-red-50 rounded-lg"
+                    >
+                      <Trash2 size={12} /> Remove
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-black text-gray-500 uppercase tracking-widest">
+                    {hfKeySaved ? 'Replace Key' : 'Enter Key'}
+                  </label>
+                  <div className="flex gap-3">
+                    <div className="relative flex-1">
+                      <Key size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type={showHfKey ? 'text' : 'password'}
+                        value={hfKey}
+                        onChange={(e) => { setHfKey(e.target.value); setHfKeySaved(false); }}
+                        placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxx"
+                        className="w-full pl-11 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-blue-300 text-gray-800 text-sm font-mono transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowHfKey(p => !p)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        {showHfKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSaveHfKey}
+                      className="px-5 py-3.5 bg-blue-600 text-white rounded-2xl font-bold text-sm hover:bg-blue-700 transition-all shadow-sm shadow-blue-200 active:scale-[0.98] shrink-0 flex items-center gap-2"
+                    >
+                      <Check size={15} />
+                      Save
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400 ml-1">Key จะเก็บใน LocalStorage ของเบราว์เซอร์เท่านั้น</p>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </form>
       </div>
     </div>
   );
