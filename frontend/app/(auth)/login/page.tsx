@@ -80,7 +80,7 @@ export default function LoginPage() {
 
       <form className="space-y-5" onSubmit={handleSubmit} method='POST'>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+          <label className="block text-sm font-semibold text-gray-700 mb-1">Username</label>
           <input 
             type="text" 
             required

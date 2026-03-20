@@ -241,7 +241,7 @@ export default function TestCasePage() {
         const chatRes = await fetch('http://127.0.0.1:8000/api/chat/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: currentInput.slice(0, 50), user_id: userId }),
+          body: JSON.stringify({ name: currentInput.slice(0, 50), user_id: userId }),
         });
         const newChat = await chatRes.json();
         activeChatId = newChat.id;

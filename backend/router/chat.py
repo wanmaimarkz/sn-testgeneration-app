@@ -25,7 +25,7 @@ class UserQuery(BaseModel):
     chat_id: int
     # chat_id: str
     columns: List[str]
-    model_source: str = "local"
+    model: str = "local"
 
 
 class ChatMove(BaseModel):
@@ -179,7 +179,7 @@ def generate_test_case(
 
     # 3. ROUTE THE INFERENCE REQUEST
     try:
-        if query.model_source == "huggingface":
+        if query.model == "cloud":
             # Check if user has saved a token
             if not user.hf_token:
                 raise HTTPException(
