@@ -192,13 +192,6 @@ def generate_test_case(
                 "Content-Type": "application/json",
             }
 
-            # Note: We enforce JSON output in the prompt if HF TGI doesn't support strict schema mapping
-            # messages[0][
-            #     "content"
-            # ] += "\n\nKeys specified. Output ONLY valid JSON matching this schema: " + json.dumps(
-            #     dynamic_schema
-            # )
-
             payload = {
                 "inputs": {
                     "target_model": "test_case",  # Routes to Qwen3-4B-Instruct
