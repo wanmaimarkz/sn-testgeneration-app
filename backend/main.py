@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
     print("8 Loading Embedding Model into RAM...")
     dependency.embed_model = Llama(
         model_path="local/Qwen3-Embedding-4B-Q8_0.gguf", # Must match ingest.py model
-        n_ctx=8192,
+        n_ctx=4096,
         embedding=True, # <--- CRITICAL FLAG
         verbose=False,
         n_gpu_layers=-1
