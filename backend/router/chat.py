@@ -2,7 +2,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, create_model
 from typing import List, Optional, Dict, Any
-from dependency import get_embedding_model, get_llm, get_rag_collection, get_db_session
+from dependency import *
 import io
 from fastapi.responses import StreamingResponse
 import pandas as pd
@@ -146,7 +146,7 @@ def get_user_chats(user_id: int, session: Session = Depends(get_db_session)):
 @router.post("/test-case")
 def generate_test_case(
     query: UserQuery,
-    llm=Depends(get_llm),
+    llm=Depends(get_test_case_llm),
     embedder=Depends(get_embedding_model),
     collection=Depends(get_rag_collection),
     session: Session = Depends(get_db_session),  # <--- Inject Database Session
@@ -278,7 +278,7 @@ def generate_test_case(
 @router.post("/test-script")
 def generate_test_script(
     query: ScriptQuery,
-    llm=Depends(get_llm),
+    llm=Depends(get_test_script_llm),
     session: Session = Depends(get_db_session),
 ):
     # 1. Verify Chat & User
