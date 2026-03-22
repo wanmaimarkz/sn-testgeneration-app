@@ -13,8 +13,8 @@ def get_db_session():
         yield session
 
 def get_llm():
-    if llm_model is None:
-        raise RuntimeError("LLM not loaded. Check lifespan events.")
+    if len(llm_model) < 2 or llm_model is None:
+        raise RuntimeError("LLMs not loaded. Check lifespan events.")
     return llm_model
 
 def get_embedding_model():

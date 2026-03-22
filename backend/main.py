@@ -15,13 +15,21 @@ async def lifespan(app: FastAPI):
     create_db_and_tables()
     
     # 2. Load LLM (The 4B model)
-    print("8 Loading LLM into RAM...")
-    dependency.llm_model = Llama(
-        model_path="local/qwen3-4b-instruct-2507.Q8_0.gguf", # Update filename if needed
-        n_ctx=8192,
-        n_gpu_layers=-1, # Offload to GPU
-        verbose=False
-    )
+    print("8 Loading LLMs into RAM...")
+    dependency.llm_models = [
+        Llama(
+            model_path="local/qwen3-4b-instruct-2507.Q8_0.gguf", # Update filename if needed
+            n_ctx=8192,
+            n_gpu_layers=-1, # Offload to GPU
+            verbose=False
+        ),
+        Llama(
+            model_path="local/Qwen2.5-Coder-7B-Instruct-Q8_0.gguf",
+            n_ctx=8192,
+            n_gpu_layers=-1, # Offload to GPU
+            verbose=False
+        )
+    ]
 
     # 3. Load Embedding Model
     print("8 Loading Embedding Model into RAM...")
