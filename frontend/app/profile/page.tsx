@@ -30,13 +30,30 @@ export default function ProfilePage() {
     if (savedKey) { setHfKey(savedKey); setHfKeySaved(true); }
   }, []);
 
-  const handleSaveHfKey = () => {
+  const handleSaveHfKey = async () => {
     const trimmed = hfKey.trim();
-    if (!trimmed) { setHfKeyStatus({ type: 'error', message: 'กรุณากรอก HuggingFace API Key' }); return; }
-    if (!trimmed.startsWith('hf_')) { setHfKeyStatus({ type: 'error', message: 'Key ต้องเริ่มต้นด้วย hf_' }); return; }
+    if (!trimmed) { setHfKeyStatus({ type: 'error', message: 'please enter HuggingFace API Key' }); return; }
+    if (!trimmed.startsWith('hf_')) { setHfKeyStatus({ type: 'error', message: 'Key must be start with "hf_"' }); return; }
+
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/profile/hf-token', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, hf_token: trimmed }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setHfKeyStatus({ type: 'error', message: data.detail || 'Failed to save key' });
+        return;
+      }
+    } catch {
+      setHfKeyStatus({ type: 'error', message: 'Cannot connect to server' });
+      return;
+    }
+
     localStorage.setItem('hf_key', trimmed);
     setHfKeySaved(true);
-    setHfKeyStatus({ type: 'success', message: 'บันทึก HuggingFace Key สำเร็จ' });
+    setHfKeyStatus({ type: 'success', message: 'Save HuggingFace Key success' });
     setTimeout(() => setHfKeyStatus({ type: '', message: '' }), 3000);
   };
 
@@ -93,12 +110,12 @@ export default function ProfilePage() {
   ] as const;
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 custom-scrollbar">
+    <div className="h-full w-full overflow-y-auto bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 custom-scrollbar">
       <div className="max-w-3xl mx-auto px-6 py-12">
 
         {/* Hero Card */}
         <div className="relative rounded-3xl overflow-hidden mb-8 shadow-xl shadow-blue-900/10">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800" />
+          <div className="absolute inset-0 bg-linear-to-br from-blue-600 via-blue-700 to-indigo-800" />
           <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/5" />
           <div className="absolute -bottom-10 -left-10 w-48 h-48 rounded-full bg-white/5" />
           <div className="absolute top-8 right-40 w-20 h-20 rounded-full bg-white/5" />
@@ -142,11 +159,10 @@ export default function ProfilePage() {
                 key={tab.id}
                 type="button"
                 onClick={() => { setActiveSection(tab.id); setStatus({ type: '', message: '' }); }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${
-                  isActive
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all ${isActive
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
                     : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 <Icon size={15} />
                 {tab.label}
@@ -157,11 +173,10 @@ export default function ProfilePage() {
 
         {/* Status Banner */}
         {status.message && (
-          <div className={`mb-5 px-5 py-4 rounded-2xl flex items-center gap-3 text-sm font-bold border ${
-            status.type === 'success'
+          <div className={`mb-5 px-5 py-4 rounded-2xl flex items-center gap-3 text-sm font-bold border ${status.type === 'success'
               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
               : 'bg-red-50 text-red-600 border-red-200'
-          }`}>
+            }`}>
             {status.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
             {status.message}
           </div>
@@ -196,11 +211,10 @@ export default function ProfilePage() {
                   <button
                     type="submit"
                     disabled={isLoading || username === initialUsername}
-                    className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl font-bold text-sm transition-all shadow-sm ${
-                      isLoading || username === initialUsername
+                    className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl font-bold text-sm transition-all shadow-sm ${isLoading || username === initialUsername
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200 active:scale-[0.98]'
-                    }`}
+                      }`}
                   >
                     <Save size={16} />
                     {isLoading ? 'Saving...' : 'Save Username'}
@@ -254,11 +268,10 @@ export default function ProfilePage() {
                 <button
                   type="submit"
                   disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
-                  className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl font-bold text-sm transition-all ${
-                    isLoading || !currentPassword || !newPassword || !confirmPassword
+                  className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl font-bold text-sm transition-all ${isLoading || !currentPassword || !newPassword || !confirmPassword
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-200 active:scale-[0.98]'
-                  }`}
+                    }`}
                 >
                   <Lock size={15} />
                   {isLoading ? 'Updating...' : 'Update Password'}
@@ -280,9 +293,8 @@ export default function ProfilePage() {
                 </div>
 
                 {hfKeyStatus.message && (
-                  <div className={`px-4 py-3 rounded-xl flex items-center gap-2.5 text-xs font-bold border ${
-                    hfKeyStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
-                  }`}>
+                  <div className={`px-4 py-3 rounded-xl flex items-center gap-2.5 text-xs font-bold border ${hfKeyStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
+                    }`}>
                     {hfKeyStatus.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
                     {hfKeyStatus.message}
                   </div>

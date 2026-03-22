@@ -11,8 +11,17 @@ import {
 
 type ModelType = 'local' | 'cloud';
 
-// ── HTML Table สำหรับแสดง test case (รองรับ array เป็นบรรทัดใหม่) ──────────
-function TestCaseTable({ data, columns }: { data: Record<string, any>; columns: string[] }) {
+// ── HTML Table สำหรับแสดง test case (รองรับ cases array หลาย row) ──────────
+function TestCaseTable({ data, columns }: { data: any; columns: string[] }) {
+  // รองรับทั้ง { cases: [...] } และ object เดี่ยว
+  const rows: Record<string, any>[] = Array.isArray(data?.cases) && data.cases.length > 0
+    ? data.cases
+    : Array.isArray(data) && data.length > 0
+      ? data
+      : data && typeof data === 'object' ? [data] : [];
+
+  const cols = columns.length > 0 ? columns : rows.length > 0 ? Object.keys(rows[0]) : [];
+
   const renderCell = (val: any) => {
     if (val === null || val === undefined || val === '') return <span className="text-gray-300">-</span>;
     if (Array.isArray(val)) {
@@ -27,26 +36,30 @@ function TestCaseTable({ data, columns }: { data: Record<string, any>; columns: 
     return <span className="text-sm">{String(val)}</span>;
   };
 
+  if (rows.length === 0) return <p className="text-sm text-gray-400 mt-2">No test cases generated.</p>;
+
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-100 mt-2">
+    <div className="overflow-x-auto overflow-y-auto max-h-[480px] rounded-xl border border-gray-100 mt-2">
       <table className="w-full text-sm border-collapse">
         <thead>
-          <tr className="bg-gray-50 border-b border-gray-100">
-            {columns.map(col => (
-              <th key={col} className="px-4 py-3 text-left text-[11px] font-black text-gray-500 uppercase tracking-wider whitespace-nowrap">
+          <tr className="bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
+            {cols.map(col => (
+              <th key={col} className="px-4 py-3 text-left text-[11px] font-black text-gray-500 uppercase tracking-wider">
                 {col}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          <tr className="align-top">
-            {columns.map(col => (
-              <td key={col} className="px-4 py-3 border-b border-gray-50 text-gray-700 min-w-[100px] max-w-[240px]">
-                {renderCell(data[col])}
-              </td>
-            ))}
-          </tr>
+          {rows.map((row, rowIdx) => (
+            <tr key={rowIdx} className="align-top border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
+              {cols.map(col => (
+                <td key={col} className="px-4 py-3 text-gray-700 w-[1%] min-w-[100px] max-w-[200px] break-words">
+                  {renderCell(row[col])}
+                </td>
+              ))}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -133,7 +146,9 @@ export default function TestCasePage() {
                 role: 'assistant',
                 content: '### 📋 Generated Test Case',
                 rawData,
-                columns: Object.keys(rawData).filter(k => k !== 'cases'),
+                columns: Array.isArray(rawData?.cases) && rawData.cases.length > 0
+                ? Object.keys(rawData.cases[0])
+                : Object.keys(rawData),
               };
             } catch {
               return { id: `history-${i}`, role: 'assistant', content: msg.content };
@@ -195,6 +210,28 @@ export default function TestCasePage() {
   const saveEdit = (id: string) => {
     setMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content: editInput } : msg));
     setEditingId(null);
+  };
+
+  const handleExportCsv = async (rawData: any) => {
+    const cases = Array.isArray(rawData?.cases) ? rawData.cases
+      : Array.isArray(rawData) ? rawData : [rawData];
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/chat/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cases),
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'test_cases.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export CSV error:', err);
+    }
   };
 
   const toggleColumn = (col: string) => {
@@ -418,7 +455,7 @@ export default function TestCasePage() {
                 {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
               </div>
 
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
                 <div className={`relative rounded-2xl p-4 shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'}`}>
                   {msg.role === 'user' && msg.attachedFile && (
                     <div className="mb-2 p-2 bg-white/20 rounded-lg flex items-center gap-2 text-[10px] font-bold border border-white/30 backdrop-blur-sm">
@@ -436,7 +473,7 @@ export default function TestCasePage() {
                       </div>
                     </div>
                   ) : (
-                    <article className={`prose prose-sm md:prose-base max-w-none ${msg.role === 'user' ? 'prose-invert' : 'prose-slate'}`}>
+                    <article className={`prose prose-sm md:prose-base max-w-none overflow-hidden ${msg.role === 'user' ? 'prose-invert' : 'prose-slate'}`}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       {msg.rawData && msg.columns && (
                         <TestCaseTable data={msg.rawData} columns={msg.columns} />
@@ -464,11 +501,11 @@ export default function TestCasePage() {
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ml-auto">
                       <div className="flex items-center gap-3 border-r border-gray-100 pr-4 mr-1">
-                        <button onClick={() => handleCopy(msg.content)} className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors uppercase"><Copy size={14} /> Copy</button>
+                        <button onClick={() => handleCopy(msg.rawData ? JSON.stringify(msg.rawData?.cases ?? msg.rawData, null, 2) : msg.content)} className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors uppercase"><Copy size={14} /> Copy</button>
                         <button onClick={() => setDeleteTargetId(msg.id)} className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase"><Trash2 size={14} /> Delete</button>
                       </div>
                       {msg.rawData && (
-                        <button className="text-[10px] font-bold uppercase text-green-600 hover:text-green-700 flex items-center gap-1.5 transition-colors">
+                        <button onClick={() => handleExportCsv(msg.rawData)} className="text-[10px] font-bold uppercase text-green-600 hover:text-green-700 flex items-center gap-1.5 transition-colors">
                           <FileSpreadsheet size={14} /> Export CSV
                         </button>
                       )}
@@ -482,7 +519,7 @@ export default function TestCasePage() {
         {isLoading && (
           <div className="flex items-center ml-14">
             <Loader2 className="animate-spin w-5 h-5 mr-2 text-blue-600" />
-            <span className="text-blue-600 font-bold text-xs animate-pulse">GENERATING</span>
+            <span className="text-blue-600 font-bold text-xs animate-pulse">GENERATING...</span>
           </div>
         )}
         <div ref={chatEndRef} />
