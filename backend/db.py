@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, create_engine
 
-SQLITE_FILE_NAME = "database/relational/data.db"
+SQLITE_FILE_NAME = "database/relational/database.db"
 DATABASE_URL = f"sqlite:///{SQLITE_FILE_NAME}"
 
 # check_same_thread=False is needed for SQLite in multithreaded web apps
