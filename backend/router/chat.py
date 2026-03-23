@@ -378,31 +378,29 @@ async def download_test_cases_csv(test_cases: List[Dict[str, Any]]):
     if not test_cases:
         raise HTTPException(status_code=400, detail="No test cases provided")
 
-    # Process data for CSV compatibility
     for item in test_cases:
         for key, value in item.items():
-            # If the LLM generated a list for this column, flatten it for the CSV cell
             if isinstance(value, list):
                 if key == "steps":
-                    # Numbered list for steps
-                    item[key] = "\n".join(
-                        f"{i+1}. {step}" for i, step in enumerate(value)
+                    cleaned = [
+                        s.lstrip("0123456789. ") if s and s[0].isdigit() else s
+                        for s in value
+                    ]
+                    # ใช้ " | " คั่นแทน \n
+                    item[key] = " | ".join(
+                        f"{i+1}. {step}" for i, step in enumerate(cleaned)
                     )
+                elif len(value) == 1:
+                    item[key] = value[0] if value[0] else ""
                 else:
-                    # Bulleted list for other list types (prerequisites, data, expected)
-                    item[key] = "\n".join(f"- {v}" for v in value)
+                    # ใช้ " | " คั่นแทน \n
+                    item[key] = " | ".join(f"- {v}" for v in value)
 
-    # Create Pandas DataFrame directly from the dynamic dictionaries
     df = pd.DataFrame(test_cases)
-
-    # Write CSV to an in-memory buffer
     stream = io.StringIO()
     df.to_csv(stream, index=False, encoding="utf-8-sig")
-
-    # Prepare the response
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=test_cases.csv"
-
     return response
 
 

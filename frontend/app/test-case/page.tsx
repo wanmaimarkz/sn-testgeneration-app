@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   Send, Bot, User, Loader2, FileText, Copy,
-  Trash2, Edit3, Check, X, FileSpreadsheet,
+  Edit3, Check, X, FileSpreadsheet,
   Paperclip, ChevronDown, CheckCircle2,
   FileUp, XCircle, Plus, AlertCircle, Cpu, Cloud, ChevronUp
 } from 'lucide-react';
@@ -39,7 +39,7 @@ function TestCaseTable({ data, columns }: { data: any; columns: string[] }) {
   if (rows.length === 0) return <p className="text-sm text-gray-400 mt-2">No test cases generated.</p>;
 
   return (
-    <div className="overflow-x-auto overflow-y-auto max-h-[480px] rounded-xl border border-gray-100 mt-2">
+    <div className="overflow-x-auto overflow-y-auto max-h-120 rounded-xl border border-gray-100 mt-2">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
@@ -54,7 +54,7 @@ function TestCaseTable({ data, columns }: { data: any; columns: string[] }) {
           {rows.map((row, rowIdx) => (
             <tr key={rowIdx} className="align-top border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
               {cols.map(col => (
-                <td key={col} className="px-4 py-3 text-gray-700 w-[1%] min-w-[100px] max-w-[200px] break-words">
+                <td key={col} className="px-4 py-3 text-gray-700 w-[1%] min-w-25 max-w-50 wrap-break-word">
                   {renderCell(row[col])}
                 </td>
               ))}
@@ -109,7 +109,6 @@ export default function TestCasePage() {
   const [editInput, setEditInput] = useState("");
 
   const [showCopyToast, setShowCopyToast] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [showColumnDropdown, setShowColumnDropdown] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [customColInput, setCustomColInput] = useState("");
@@ -195,21 +194,45 @@ export default function TestCasePage() {
     setTimeout(() => setShowCopyToast(false), 2000);
   };
 
-  const confirmDelete = () => {
-    if (deleteTargetId) {
-      setMessages(prev => prev.filter(msg => msg.id !== deleteTargetId));
-      setDeleteTargetId(null);
-    }
-  };
-
   const startEdit = (id: string, content: string) => {
     setEditingId(id);
     setEditInput(content);
   };
 
-  const saveEdit = (id: string) => {
-    setMessages(prev => prev.map(msg => msg.id === id ? { ...msg, content: editInput } : msg));
+  const saveEdit = async (id: string) => {
+    if (!editInput.trim() || !chatId) { setEditingId(null); return; }
+
+    // อัปเดต user message + ลบ assistant message ล่าสุดออก
+    setMessages(prev => {
+      const updated = prev.map(msg => msg.id === id ? { ...msg, content: editInput } : msg);
+      const lastAssistantIdx = [...updated].map((m, i) => m.role === 'assistant' ? i : -1).filter(i => i !== -1).pop();
+      if (lastAssistantIdx === undefined) return updated;
+      return updated.filter((_, i) => i !== lastAssistantIdx);
+    });
     setEditingId(null);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/chat/test-case', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: editInput, chat_id: chatId, columns: selectedColumns, model: selectedModel }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Generation failed');
+
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: '### 📋 Generated Test Case',
+        rawData: data,
+        columns: [...selectedColumns],
+      }]);
+    } catch (error: any) {
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: `❌ Error: ${error.message}` }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleExportCsv = async (rawData: any) => {
@@ -318,29 +341,12 @@ export default function TestCasePage() {
   };
 
   return (
-    <div className="relative bg-white rounded-2xl shadow-xl flex-1 flex flex-col overflow-hidden h-full border border-gray-100">
+    <div className="relative bg-slate-50 rounded-2xl shadow-xl flex-1 flex flex-col overflow-hidden h-full border border-gray-100">
 
       {/* Toast Notification */}
       {showCopyToast && (
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 z-[60] bg-emerald-500 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 font-bold animate-in fade-in slide-in-from-top-4">
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 z-60 bg-emerald-500 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 font-bold animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 size={18} /> Copied!
-        </div>
-      )}
-
-      {/* Delete Dialog */}
-      {deleteTargetId && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 border border-gray-100">
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="p-4 bg-red-50 text-red-500 rounded-full"><AlertCircle size={40} /></div>
-              <h3 className="text-xl font-black text-gray-800">Delete Message?</h3>
-              <p className="text-sm text-gray-500 font-medium">This action cannot be undone.</p>
-              <div className="flex gap-3 w-full mt-4">
-                <button onClick={() => setDeleteTargetId(null)} className="flex-1 py-3 font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
-                <button onClick={confirmDelete} className="flex-1 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-100">Delete</button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -448,7 +454,9 @@ export default function TestCasePage() {
             <p className="text-sm font-bold tracking-wide">Describe the testcase or feature you want to create.</p>
           </div>
         )}
-        {messages.map((msg) => (
+        {(() => {
+          const lastUserIndex = messages.reduce((acc, m, i) => m.role === 'user' ? i : acc, -1);
+          return messages.map((msg, index) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group animate-in fade-in duration-500`}>
             <div className={`flex gap-4 max-w-[95%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
               <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 text-blue-600'}`}>
@@ -460,7 +468,7 @@ export default function TestCasePage() {
                   {msg.role === 'user' && msg.attachedFile && (
                     <div className="mb-2 p-2 bg-white/20 rounded-lg flex items-center gap-2 text-[10px] font-bold border border-white/30 backdrop-blur-sm">
                       <FileUp size={12} />
-                      <span className="truncate max-w-[150px]">{msg.attachedFile.name}</span>
+                      <span className="truncate max-w-37.5">{msg.attachedFile.name}</span>
                       <span className="opacity-60">({(msg.attachedFile.size / 1024).toFixed(1)} KB)</span>
                     </div>
                   )}
@@ -488,21 +496,21 @@ export default function TestCasePage() {
                     {msg.role === 'user' ? 'YOU' : 'AI ASSISTANT'}
                   </span>
 
-                  {/* User Toolbar: ชิดซ้าย */}
+                  {/* User Toolbar */}
                   {msg.role === 'user' && (
                     <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <button onClick={() => handleCopy(msg.content)} className="text-gray-400 hover:text-blue-600"><Copy size={14} /></button>
-                      <button onClick={() => startEdit(msg.id, msg.content)} className="text-gray-400 hover:text-blue-500"><Edit3 size={14} /></button>
-                      <button onClick={() => setDeleteTargetId(msg.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                      {index === lastUserIndex && !isLoading && (
+                        <button onClick={() => startEdit(msg.id, msg.content)} className="text-gray-400 hover:text-blue-500"><Edit3 size={14} /></button>
+                      )}
                     </div>
                   )}
 
                   {/* AI Toolbar: ชิดขวา */}
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ml-auto">
-                      <div className="flex items-center gap-3 border-r border-gray-100 pr-4 mr-1">
+                      <div className="flex items-center gap-3 pr-4 mr-1">
                         <button onClick={() => handleCopy(msg.rawData ? JSON.stringify(msg.rawData?.cases ?? msg.rawData, null, 2) : msg.content)} className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors uppercase"><Copy size={14} /> Copy</button>
-                        <button onClick={() => setDeleteTargetId(msg.id)} className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase"><Trash2 size={14} /> Delete</button>
                       </div>
                       {msg.rawData && (
                         <button onClick={() => handleExportCsv(msg.rawData)} className="text-[10px] font-bold uppercase text-green-600 hover:text-green-700 flex items-center gap-1.5 transition-colors">
@@ -515,7 +523,8 @@ export default function TestCasePage() {
               </div>
             </div>
           </div>
-        ))}
+          ));
+        })()}
         {isLoading && (
           <div className="flex items-center ml-14">
             <Loader2 className="animate-spin w-5 h-5 mr-2 text-blue-600" />

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from dependency import get_db_session, get_rag_collection
 from model import Folder, Chat, Message
 
-router = APIRouter(prefix="/folders", tags=["Folders"])
+router = APIRouter(prefix="/folder", tags=["Folders"])
 
 
 class FolderCreate(BaseModel):

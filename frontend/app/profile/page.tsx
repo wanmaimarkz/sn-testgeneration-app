@@ -199,26 +199,14 @@ export default function ProfilePage() {
                       <User size={15} className="text-blue-500" />
                     </div>
                     <input
+                      disabled
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       required
-                      className="w-full pl-16 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-blue-300 transition-all text-gray-800 font-semibold text-sm"
+                      className="w-full pl-16 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white focus:border-blue-300 transition-all text-gray-400 font-semibold text-sm"
                     />
                   </div>
-                </div>
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={isLoading || username === initialUsername}
-                    className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl font-bold text-sm transition-all shadow-sm ${isLoading || username === initialUsername
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200 active:scale-[0.98]'
-                      }`}
-                  >
-                    <Save size={16} />
-                    {isLoading ? 'Saving...' : 'Save Username'}
-                  </button>
                 </div>
               </div>
             )}
@@ -228,7 +216,7 @@ export default function ProfilePage() {
               <div className="p-8 space-y-6">
                 <div>
                   <h2 className="text-base font-black text-gray-800 mb-1">Change Password</h2>
-                  <p className="text-xs text-gray-400 font-medium">ต้องใส่รหัสปัจจุบันก่อนเปลี่ยน</p>
+                  <p className="text-xs text-gray-400 font-medium">You must verify your current password before changing it.</p>
                 </div>
                 <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl space-y-3">
                   <div className="flex items-center gap-2">
@@ -285,7 +273,7 @@ export default function ProfilePage() {
                 <div>
                   <h2 className="text-base font-black text-gray-800 mb-1">HuggingFace API Key</h2>
                   <p className="text-xs text-gray-400 font-medium">
-                    ใช้สำหรับ Cloud Model — รับ key ได้ที่{' '}
+                    Required for Cloud Model — get your key at{' '}
                     <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 font-bold hover:underline">
                       huggingface.co/settings/tokens
                     </a>
@@ -350,7 +338,7 @@ export default function ProfilePage() {
                       Save
                     </button>
                   </div>
-                  <p className="text-[11px] text-gray-400 ml-1">Key จะเก็บใน LocalStorage ของเบราว์เซอร์เท่านั้น</p>
+                  <p className="text-[11px] text-gray-400 ml-1">Your key is stored locally in your browser only.</p>
                 </div>
               </div>
             )}

@@ -56,7 +56,7 @@ const api = {
       .then(r => r.json()) as Promise<Chat[]>,
 
   getFolders: (userId: number) =>
-    fetchWithTimeout(`${API_BASE}/folders/user/${userId}`)
+    fetchWithTimeout(`${API_BASE}/folder/user/${userId}`)
       .then(r => r.json()) as Promise<FolderItem[]>,
 
   deleteChat: (chatId: number) =>
@@ -77,7 +77,7 @@ const api = {
     }),
 
   createFolder: async (name: string, userId: number) => {
-    const res = await fetch(`${API_BASE}/folders/`, {
+    const res = await fetch(`${API_BASE}/folder/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, user_id: userId }),
@@ -88,10 +88,10 @@ const api = {
   },
 
   deleteFolder: (folderId: number) =>
-    fetch(`${API_BASE}/folders/${folderId}`, { method: 'DELETE' }),
+    fetch(`${API_BASE}/folder/${folderId}`, { method: 'DELETE' }),
 
   renameFolder: (folderId: number, name: string) =>
-    fetch(`${API_BASE}/folders/${folderId}/rename`, {
+    fetch(`${API_BASE}/folder/${folderId}/rename`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
