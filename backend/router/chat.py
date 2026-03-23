@@ -49,6 +49,10 @@ class ChatRename(BaseModel):
     name: str
 
 
+class DownloadQuery(BaseModel):
+    cases: List[Dict[str, Any]]
+
+
 # --- HELPER: CONSTRUCT PROMPT ---
 def build_dynamic_json_schema(columns: List[str]) -> dict:
     """Dynamically creates a Pydantic schema for an ARRAY of test cases."""
@@ -374,30 +378,39 @@ def generate_test_script(
 
 
 @router.post("/download")
-async def download_test_cases_csv(test_cases: List[Dict[str, Any]]):
-    if not test_cases:
+async def download_test_cases(query: DownloadQuery):
+    if not query.cases:
         raise HTTPException(status_code=400, detail="No test cases provided")
 
+    processed_cases = []
+
     # Process data for CSV compatibility
-    for item in test_cases:
+    for item in query.cases:
+        processed_item = {}
         for key, value in item.items():
-            # If the LLM generated a list for this column, flatten it for the CSV cell
             if isinstance(value, list):
                 if key == "steps":
                     # Numbered list for steps
-                    item[key] = "\n".join(
+                    processed_item[key] = "\n".join(
                         f"{i+1}. {step}" for i, step in enumerate(value)
                     )
                 else:
                     # Bulleted list for other list types (prerequisites, data, expected)
-                    item[key] = "\n".join(f"- {v}" for v in value)
+                    processed_item[key] = "\n".join(f" - {v}" for v in value)
+            elif value is None:
+                # Catch the null fields (like 'actual', 'status') and convert to empty strings for the CSV
+                processed_item[key] = ""
+            else:
+                processed_item[key] = value
 
-    # Create Pandas DataFrame directly from the dynamic dictionaries
-    df = pd.DataFrame(test_cases)
+        processed_cases.append(processed_item)
+
+    # Create Pandas DataFrame directly from the processed dictionaries
+    df = pd.DataFrame(processed_cases)
 
     # Write CSV to an in-memory buffer
     stream = io.StringIO()
-    df.to_csv(stream, index=False, encoding="utf-8-sig")
+    df.to_csv(stream, index=False, encoding="utf-8")
 
     # Prepare the response
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
