@@ -28,6 +28,8 @@ backend/local/*
 # ยกเว้นไฟล์ database แต่ยังคงโครงสร้างโฟลเดอร์ database/relational หรือ vector ไว้
 backend/database/**/*.db
 backend/database/**/*.sqlite3
+backend/database/vector/*
+backend/database/relational/*
 # หากต้องการ ignore ทุกอย่างใน database ยกเว้นโฟลเดอร์ว่าง
 # backend/database/*
 # !backend/database/.gitkeep
