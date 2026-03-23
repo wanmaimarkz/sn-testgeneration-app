@@ -9,7 +9,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   // State สำหรับเก็บค่าจาก Input
   const [formData, setFormData] = useState({
     email: '',
@@ -51,13 +51,18 @@ export default function LoginPage() {
         localStorage.setItem('user', JSON.stringify({
           id: data.user_id,       // map user_id → id ให้ตรงกับที่ layout.tsx อ่าน
           username: data.username,
+          hf_token: data.hf_token,
         }));
+
+        if (data.hf_token) {
+          localStorage.setItem('hf_key', data.hf_token);
+        }
 
         document.cookie = "isLoggedIn=true; path=/; max-age=86400"; // อยู่ได้ 1 วัน
 
         router.push('/');
       }
-      
+
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -81,11 +86,11 @@ export default function LoginPage() {
       <form className="space-y-5" onSubmit={handleSubmit} method='POST'>
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">Username</label>
-          <input 
-            type="text" 
+          <input
+            type="text"
             required
             value={formData.email}
-            onChange={(e) => setFormData({...formData, email: e.target.value})}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             className="w-full text-black p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all hover:border-purple-300"
             placeholder="name@company.com"
           />
@@ -93,15 +98,15 @@ export default function LoginPage() {
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
           <div className="relative">
-            <input 
-              type={showPassword ? "text" : "password"} 
+            <input
+              type={showPassword ? "text" : "password"}
               required
               value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               className="w-full text-black p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
               placeholder="Enter your password..."
             />
-            <button 
+            <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-3.5 text-gray-400 hover:text-purple-600"
@@ -110,19 +115,19 @@ export default function LoginPage() {
             </button>
           </div>
         </div>
-        
+
         <div className="flex justify-end">
           <Link href="/reset-password" className="text-sm text-blue-600 hover:underline">Forgot Password?</Link>
         </div>
 
-        <button 
+        <button
           disabled={isLoading}
           className="w-full bg-gray-900 text-white py-3.5 rounded-xl font-bold hover:bg-black transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
         >
           {isLoading ? <Loader2 size={18} className="animate-spin" /> : 'Sign In'}
         </button>
       </form>
-      
+
       <p className="text-center text-sm text-gray-600 mt-8">
         Don't have an account? <Link href="/register" className="text-blue-600 font-bold hover:underline">Sign up</Link>
       </p>
