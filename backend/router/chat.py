@@ -2,7 +2,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, create_model
 from typing import List, Optional, Dict, Any
-from dependency import get_embedding_model, get_llm, get_rag_collection, get_db_session
+from dependency import *
 import io
 from fastapi.responses import StreamingResponse
 import pandas as pd
@@ -47,6 +47,10 @@ class ChatCreate(BaseModel):
 
 class ChatRename(BaseModel):
     name: str
+
+
+class DownloadQuery(BaseModel):
+    cases: List[Dict[str, Any]]
 
 
 # --- HELPER: CONSTRUCT PROMPT ---
@@ -146,7 +150,7 @@ def get_user_chats(user_id: int, session: Session = Depends(get_db_session)):
 @router.post("/test-case")
 def generate_test_case(
     query: UserQuery,
-    llm=Depends(get_llm),
+    llm=Depends(get_test_case_llm),
     embedder=Depends(get_embedding_model),
     collection=Depends(get_rag_collection),
     session: Session = Depends(get_db_session),  # <--- Inject Database Session
@@ -278,7 +282,7 @@ def generate_test_case(
 @router.post("/test-script")
 def generate_test_script(
     query: ScriptQuery,
-    llm=Depends(get_llm),
+    llm=Depends(get_test_script_llm),
     session: Session = Depends(get_db_session),
 ):
     # 1. Verify Chat & User
@@ -374,33 +378,44 @@ def generate_test_script(
 
 
 @router.post("/download")
-async def download_test_cases_csv(test_cases: List[Dict[str, Any]]):
-    if not test_cases:
+async def download_test_cases(query: DownloadQuery):
+    if not query.cases:
         raise HTTPException(status_code=400, detail="No test cases provided")
 
-    for item in test_cases:
+    processed_cases = []
+
+    # Process data for CSV compatibility
+    for item in query.cases:
+        processed_item = {}
         for key, value in item.items():
             if isinstance(value, list):
                 if key == "steps":
-                    cleaned = [
-                        s.lstrip("0123456789. ") if s and s[0].isdigit() else s
-                        for s in value
-                    ]
-                    # ใช้ " | " คั่นแทน \n
-                    item[key] = " | ".join(
-                        f"{i+1}. {step}" for i, step in enumerate(cleaned)
+                    # Numbered list for steps
+                    processed_item[key] = "\n".join(
+                        f"{i+1}. {step}" for i, step in enumerate(value)
                     )
-                elif len(value) == 1:
-                    item[key] = value[0] if value[0] else ""
                 else:
-                    # ใช้ " | " คั่นแทน \n
-                    item[key] = " | ".join(f"- {v}" for v in value)
+                    # Bulleted list for other list types (prerequisites, data, expected)
+                    processed_item[key] = "\n".join(f" - {v}" for v in value)
+            elif value is None:
+                # Catch the null fields (like 'actual', 'status') and convert to empty strings for the CSV
+                processed_item[key] = ""
+            else:
+                processed_item[key] = value
 
-    df = pd.DataFrame(test_cases)
+        processed_cases.append(processed_item)
+
+    # Create Pandas DataFrame directly from the processed dictionaries
+    df = pd.DataFrame(processed_cases)
+
+    # Write CSV to an in-memory buffer
     stream = io.StringIO()
-    df.to_csv(stream, index=False, encoding="utf-8-sig")
+    df.to_csv(stream, index=False, encoding="utf-8")
+
+    # Prepare the response
     response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=test_cases.csv"
+
     return response
 
 

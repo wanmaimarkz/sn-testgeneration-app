@@ -8,76 +8,23 @@ import {
   Paperclip, ChevronDown, CheckCircle2,
   FileUp, XCircle, Plus, AlertCircle, Cpu, Cloud, ChevronUp
 } from 'lucide-react';
+import { TestCaseTable } from '@/components/testcase/TestCaseTable';
+import { GenerateScriptBubble } from '@/components/testcase/GenerateScriptBubble';
 
 type ModelType = 'local' | 'cloud';
-
-// ── HTML Table สำหรับแสดง test case (รองรับ cases array หลาย row) ──────────
-function TestCaseTable({ data, columns }: { data: any; columns: string[] }) {
-  // รองรับทั้ง { cases: [...] } และ object เดี่ยว
-  const rows: Record<string, any>[] = Array.isArray(data?.cases) && data.cases.length > 0
-    ? data.cases
-    : Array.isArray(data) && data.length > 0
-      ? data
-      : data && typeof data === 'object' ? [data] : [];
-
-  const cols = columns.length > 0 ? columns : rows.length > 0 ? Object.keys(rows[0]) : [];
-
-  const renderCell = (val: any) => {
-    if (val === null || val === undefined || val === '') return <span className="text-gray-300">-</span>;
-    if (Array.isArray(val)) {
-      return (
-        <ol className="list-decimal list-inside space-y-1 text-left">
-          {val.map((item, i) => (
-            <li key={i} className="text-sm leading-snug">{item}</li>
-          ))}
-        </ol>
-      );
-    }
-    return <span className="text-sm">{String(val)}</span>;
-  };
-
-  if (rows.length === 0) return <p className="text-sm text-gray-400 mt-2">No test cases generated.</p>;
-
-  return (
-    <div className="overflow-x-auto overflow-y-auto max-h-120 rounded-xl border border-gray-100 mt-2">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
-            {cols.map(col => (
-              <th key={col} className="px-4 py-3 text-left text-[11px] font-black text-gray-500 uppercase tracking-wider">
-                {col}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIdx) => (
-            <tr key={rowIdx} className="align-top border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
-              {cols.map(col => (
-                <td key={col} className="px-4 py-3 text-gray-700 w-[1%] min-w-25 max-w-50 wrap-break-word">
-                  {renderCell(row[col])}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 const MODELS: { id: ModelType; label: string; desc: string; badge: string; badgeColor: string }[] = [
   {
     id: 'local',
     label: 'Local',
-    desc: 'รันบนเครื่องตัวเอง ต้องโหลดโมเดลก่อน',
+    desc: 'Runs on your device. Requires model download before use.',
     badge: 'On-device',
     badgeColor: 'bg-emerald-100 text-emerald-700',
   },
   {
     id: 'cloud',
     label: 'Cloud',
-    desc: 'ใช้ token พร้อมใช้งานได้เลย เร็วกว่า',
+    desc: 'Uses API tokens. Ready to use immediately with faster performance.',
     badge: 'API',
     badgeColor: 'bg-blue-100 text-blue-700',
   },
@@ -88,12 +35,12 @@ export default function TestCasePage() {
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [noHfKeyWarning, setNoHfKeyWarning] = useState(false);
 
-  // อ่าน HF key จาก localStorage (บันทึกจากหน้า Profile)
   const [hasHfKey, setHasHfKey] = useState(false);
   useEffect(() => {
     const key = localStorage.getItem('hf_key');
     setHasHfKey(!!key && key.startsWith('hf_'));
   }, []);
+
   const [messages, setMessages] = useState<{
     id: string,
     role: string,
@@ -121,7 +68,6 @@ export default function TestCasePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const modelPickerRef = useRef<HTMLDivElement>(null);
-  // chatId จะเป็น null จนกว่าจะสร้าง chat จริงครั้งแรก
   const [chatId, setChatId] = useState<number | null>(null);
 
   // โหลด chat history เมื่อคลิกจาก SidebarRight
@@ -139,15 +85,14 @@ export default function TestCasePage() {
           if (msg.role === 'assistant') {
             try {
               const rawData = JSON.parse(msg.content);
-              // คาดว่า content เป็น JSON ที่ save ไว้
               return {
                 id: `history-${i}`,
                 role: 'assistant',
                 content: '### 📋 Generated Test Case',
                 rawData,
                 columns: Array.isArray(rawData?.cases) && rawData.cases.length > 0
-                ? Object.keys(rawData.cases[0])
-                : Object.keys(rawData),
+                  ? Object.keys(rawData.cases[0])
+                  : Object.keys(rawData),
               };
             } catch {
               return { id: `history-${i}`, role: 'assistant', content: msg.content };
@@ -166,7 +111,6 @@ export default function TestCasePage() {
     return () => window.removeEventListener('chat:selected', handler);
   }, []);
 
-  // อ่าน userId จาก localStorage (บันทึกตอน login)
   const [userId, setUserId] = useState<number | null>(null);
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -176,7 +120,6 @@ export default function TestCasePage() {
   const scrollToBottom = () => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
 
-  // ปิด model picker เมื่อคลิกนอก
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (modelPickerRef.current && !modelPickerRef.current.contains(e.target as Node)) {
@@ -202,7 +145,6 @@ export default function TestCasePage() {
   const saveEdit = async (id: string) => {
     if (!editInput.trim() || !chatId) { setEditingId(null); return; }
 
-    // อัปเดต user message + ลบ assistant message ล่าสุดออก
     setMessages(prev => {
       const updated = prev.map(msg => msg.id === id ? { ...msg, content: editInput } : msg);
       const lastAssistantIdx = [...updated].map((m, i) => m.role === 'assistant' ? i : -1).filter(i => i !== -1).pop();
@@ -242,7 +184,7 @@ export default function TestCasePage() {
       const res = await fetch('http://127.0.0.1:8000/api/chat/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cases),
+        body: JSON.stringify({ cases: cases })
       });
       if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
@@ -295,7 +237,6 @@ export default function TestCasePage() {
     setIsLoading(true);
 
     try {
-      // สร้าง chat ใหม่ถ้ายังไม่มี (ครั้งแรกที่ส่งข้อความ)
       let activeChatId = chatId;
       if (!activeChatId) {
         const chatRes = await fetch('http://127.0.0.1:8000/api/chat/', {
@@ -306,7 +247,6 @@ export default function TestCasePage() {
         const newChat = await chatRes.json();
         activeChatId = newChat.id;
         setChatId(newChat.id);
-        // ไม่ dispatch ตรงนี้ — รอให้ generate เสร็จก่อน
       }
 
       if (currentFile) {
@@ -333,7 +273,6 @@ export default function TestCasePage() {
         columns: [...selectedColumns],
       }]);
 
-      // แจ้ง SidebarRight ให้ refetch หลัง generate เสร็จแล้ว
       window.dispatchEvent(new CustomEvent('chat:created'));
     } catch (error: any) {
       setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: `❌ Error: ${error.message}` }]);
@@ -372,16 +311,15 @@ export default function TestCasePage() {
             {showModelPicker ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
 
-          {/* Dropdown Panel */}
           {showModelPicker && (
             <div className="absolute right-0 top-full mt-2 w-72 bg-gray-900 rounded-3xl shadow-2xl z-50 p-2 border border-gray-700 animate-in fade-in slide-in-from-top-2">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-4 pt-3 pb-2">
                 Select Model
               </p>
 
-              {/* No HF Key Warning */}
               {noHfKeyWarning && (
                 <div className="mx-2 mb-2 px-3 py-2.5 bg-red-500/20 border border-red-500/40 rounded-xl flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle size={14} className="text-red-400 shrink-0" />
                   <span className="text-red-400 text-xs font-bold">⚠️ ต้องเพิ่ม HuggingFace API Key ก่อน ไปที่ Profile Settings</span>
                 </div>
               )}
@@ -422,7 +360,7 @@ export default function TestCasePage() {
                         </div>
                         <p className="text-gray-400 text-xs leading-snug">{model.desc}</p>
                         {isDisabled && (
-                          <p className="text-red-400 text-[10px] mt-0.5">ต้องตั้งค่า HF Key ใน Profile ก่อน</p>
+                          <p className="text-red-400 text-[10px] mt-0.5">HF Key required. Please configure it in your Profile.</p>
                         )}
                       </div>
                     </div>
@@ -437,8 +375,8 @@ export default function TestCasePage() {
               <div className="px-4 py-3 border-t border-gray-700 mt-1">
                 <p className="text-[10px] text-gray-500 leading-relaxed">
                   {selectedModel === 'local'
-                    ? '⚡ Local: ข้อมูลไม่ออกเครื่อง แต่ใช้ RAM สูง'
-                    : '☁️ Cloud: ต้องการ API token และ internet'}
+                    ? '⚡ Local: Data stays on-device, but requires high RAM usage'
+                    : '☁️ Cloud: Requires API token and internet connection'}
                 </p>
               </div>
             </div>
@@ -457,72 +395,81 @@ export default function TestCasePage() {
         {(() => {
           const lastUserIndex = messages.reduce((acc, m, i) => m.role === 'user' ? i : acc, -1);
           return messages.map((msg, index) => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group animate-in fade-in duration-500`}>
-            <div className={`flex gap-4 max-w-[95%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 text-blue-600'}`}>
-                {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
-              </div>
-
-              <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
-                <div className={`relative rounded-2xl p-4 shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'}`}>
-                  {msg.role === 'user' && msg.attachedFile && (
-                    <div className="mb-2 p-2 bg-white/20 rounded-lg flex items-center gap-2 text-[10px] font-bold border border-white/30 backdrop-blur-sm">
-                      <FileUp size={12} />
-                      <span className="truncate max-w-37.5">{msg.attachedFile.name}</span>
-                      <span className="opacity-60">({(msg.attachedFile.size / 1024).toFixed(1)} KB)</span>
-                    </div>
-                  )}
-                  {editingId === msg.id ? (
-                    <div className="flex flex-col gap-2 min-w-52">
-                      <textarea value={editInput} onChange={(e) => setEditInput(e.target.value)} className="w-full p-2 rounded-lg bg-white/10 text-white outline-none border border-white/20" rows={3} autoFocus />
-                      <div className="flex justify-end gap-2 text-white">
-                        <button onClick={() => saveEdit(msg.id)} className="p-1 hover:bg-white/20 rounded"><Check size={16} /></button>
-                        <button onClick={() => setEditingId(null)} className="p-1 hover:bg-white/20 rounded"><X size={16} /></button>
-                      </div>
-                    </div>
-                  ) : (
-                    <article className={`prose prose-sm md:prose-base max-w-none overflow-hidden ${msg.role === 'user' ? 'prose-invert' : 'prose-slate'}`}>
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                      {msg.rawData && msg.columns && (
-                        <TestCaseTable data={msg.rawData} columns={msg.columns} />
-                      )}
-                    </article>
-                  )}
+            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group animate-in fade-in duration-500`}>
+              <div className={`flex gap-4 max-w-[95%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 text-blue-600'}`}>
+                  {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
                 </div>
 
-                {/* Toolbar & Info Section */}
-                <div className={`flex items-center mt-1 px-2 ${msg.role === 'user' ? 'flex-row-reverse justify-between' : 'justify-between'}`}>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                    {msg.role === 'user' ? 'YOU' : 'AI ASSISTANT'}
-                  </span>
-
-                  {/* User Toolbar */}
-                  {msg.role === 'user' && (
-                    <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <button onClick={() => handleCopy(msg.content)} className="text-gray-400 hover:text-blue-600"><Copy size={14} /></button>
-                      {index === lastUserIndex && !isLoading && (
-                        <button onClick={() => startEdit(msg.id, msg.content)} className="text-gray-400 hover:text-blue-500"><Edit3 size={14} /></button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* AI Toolbar: ชิดขวา */}
-                  {msg.role === 'assistant' && (
-                    <div className="flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ml-auto">
-                      <div className="flex items-center gap-3 pr-4 mr-1">
-                        <button onClick={() => handleCopy(msg.rawData ? JSON.stringify(msg.rawData?.cases ?? msg.rawData, null, 2) : msg.content)} className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors uppercase"><Copy size={14} /> Copy</button>
+                <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
+                  <div className={`relative rounded-2xl p-4 shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'}`}>
+                    {msg.role === 'user' && msg.attachedFile && (
+                      <div className="mb-2 p-2 bg-white/20 rounded-lg flex items-center gap-2 text-[10px] font-bold border border-white/30 backdrop-blur-sm">
+                        <FileUp size={12} />
+                        <span className="truncate max-w-37.5">{msg.attachedFile.name}</span>
+                        <span className="opacity-60">({(msg.attachedFile.size / 1024).toFixed(1)} KB)</span>
                       </div>
-                      {msg.rawData && (
-                        <button onClick={() => handleExportCsv(msg.rawData)} className="text-[10px] font-bold uppercase text-green-600 hover:text-green-700 flex items-center gap-1.5 transition-colors">
-                          <FileSpreadsheet size={14} /> Export CSV
-                        </button>
-                      )}
-                    </div>
-                  )}
+                    )}
+                    {editingId === msg.id ? (
+                      <div className="flex flex-col gap-2 min-w-52">
+                        <textarea value={editInput} onChange={(e) => setEditInput(e.target.value)} className="w-full p-2 rounded-lg bg-white/10 text-white outline-none border border-white/20" rows={3} autoFocus />
+                        <div className="flex justify-end gap-2 text-white">
+                          <button onClick={() => saveEdit(msg.id)} className="p-1 hover:bg-white/20 rounded"><Check size={16} /></button>
+                          <button onClick={() => setEditingId(null)} className="p-1 hover:bg-white/20 rounded"><X size={16} /></button>
+                        </div>
+                      </div>
+                    ) : (
+                      <article className={`prose prose-sm md:prose-base max-w-none overflow-hidden ${msg.role === 'user' ? 'prose-invert' : 'prose-slate'}`}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                        {msg.rawData && msg.columns && (
+                          <TestCaseTable data={msg.rawData} columns={msg.columns} />
+                        )}
+                      </article>
+                    )}
+                  </div>
+
+                  {/* Toolbar & Info Section */}
+                  <div className={`flex items-center mt-1 px-2 ${msg.role === 'user' ? 'flex-row-reverse justify-between' : 'justify-between'}`}>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      {msg.role === 'user' ? 'YOU' : 'AI ASSISTANT'}
+                    </span>
+
+                    {msg.role === 'user' && (
+                      <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <button onClick={() => handleCopy(msg.content)} className="text-gray-400 hover:text-blue-600"><Copy size={14} /></button>
+                        {index === lastUserIndex && !isLoading && (
+                          <button onClick={() => startEdit(msg.id, msg.content)} className="text-gray-400 hover:text-blue-500"><Edit3 size={14} /></button>
+                        )}
+                      </div>
+                    )}
+
+                    {msg.role === 'assistant' && (
+                      <div className="flex items-baseline gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ml-auto">
+                        <div className="flex items-center gap-3 pr-4 mr-1">
+                          <button onClick={() => handleCopy(msg.rawData ? JSON.stringify(msg.rawData?.cases ?? msg.rawData, null, 2) : msg.content)} className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors uppercase"><Copy size={14} /> Copy JSON</button>
+                        </div>
+                        {msg.rawData && (
+                          <>
+                            <button
+                              onClick={() => handleExportCsv(msg.rawData)}
+                              className="text-[10px] font-bold uppercase text-green-600 hover:text-green-700 flex items-center gap-1.5 transition-colors"
+                            >
+                              <FileSpreadsheet size={14} /> Export CSV
+                            </button>
+
+                            <GenerateScriptBubble
+                              rawData={msg.rawData}
+                              chatId={chatId}
+                              model={selectedModel}
+                            />
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
           ));
         })()}
         {isLoading && (
