@@ -218,7 +218,7 @@ def generate_test_case(
                     "target_model": "test_case",  # Routes to Qwen3-4B-Instruct
                     "messages": messages,
                     "temperature": 0.1,
-                    "max_tokens": 1024,
+                    "max_tokens": 2048,
                     "repeat_penalty": 1.05,
                     "response_format": {
                         "type": "json_schema",
@@ -244,7 +244,7 @@ def generate_test_case(
                 messages=messages,
                 response_format={"type": "json_schema", "schema": dynamic_schema},
                 temperature=0.1,
-                max_tokens=1024,
+                max_tokens=2048,
                 repeat_penalty=1.05,
                 stop=["<|im_end|>"],
             )

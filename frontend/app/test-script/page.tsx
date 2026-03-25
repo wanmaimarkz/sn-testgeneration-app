@@ -78,11 +78,11 @@ export default function TestScriptPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/chat/test-case', {
+      const response = await fetch('http://127.0.0.1:8000/api/chat/test-script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          text: `Generate a Postman test script for: ${input}`, 
+          cases: input, 
           chat_id: chatId 
         }),
       });
@@ -195,7 +195,7 @@ export default function TestScriptPage() {
       {/* Input Form */}
       <form onSubmit={handleSend} className="p-4 bg-white border-t flex gap-3 items-center">
         <input value={input} onChange={(e) => setInput(e.target.value)} disabled={isLoading} className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white text-gray-600 transition-all font-medium disabled:opacity-50" placeholder="e.g., Create a test script for user registration API..." />
-        <button disabled={isLoading || !input.trim()} className="bg-purple-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-100 active:scale-95 transition-all shrink-0"><Send size={20}/></button>
+        <button disabled={isLoading || !input.trim()} className="bg-purple-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-100 active:scale-95 transition-all shrink-0 cursor-pointer"><Send size={20}/></button>
       </form>
     </div>
   );
