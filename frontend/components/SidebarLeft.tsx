@@ -24,7 +24,7 @@ export default function SidebarLeft() {
 
 
   const menuItems = [
-    { name: 'Dashboard', icon: House, path: '/' },
+    { name: 'Home', icon: House, path: '/' },
     { name: 'Test Case', icon: FileText, path: '/test-case/' },
     { name: 'Test Script', icon: Terminal, path: '/test-script/' },
     { name: 'Profile', icon: UserCircle, path: '/profile/' },
