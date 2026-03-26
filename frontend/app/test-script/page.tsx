@@ -72,6 +72,58 @@ export default function TestScriptPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // ── Listen to Sidebar Chat Selection ──
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const { chatId: selectedId } = (e as CustomEvent).detail;
+
+      if (!selectedId) return;
+
+      setChatId(selectedId);
+      setMessages([]);
+      setIsLoading(true);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/api/chat/${selectedId}/history`);
+        if (!res.ok) throw new Error('Failed to load history');
+
+        const history: { role: string; content: string }[] = await res.json();
+
+        // 🛠️ แก้ไขการ Map ข้อมูลตรงนี้ให้ตรงกับตัวแปรที่ใช้ Render ใน UI
+        const loadedMessages: Message[] = history.map((msg, i) => {
+          if (msg.role === 'assistant') {
+            return {
+              id: `history-${i}`,
+              role: 'assistant',
+              code: msg.content, // ใช้ `code` สำหรับผลลัพธ์จาก AI
+            };
+          }
+          // ฝั่ง user (ส่วนใหญ่ส่งเป็น JSON input เข้ามา)
+          return {
+            id: `history-${i}`,
+            role: 'user',
+            jsonInput: msg.content, // ใช้ `jsonInput` สำหรับ input ของผู้ใช้
+          };
+        });
+
+        setMessages(loadedMessages);
+
+      } catch (err) {
+        console.error('Failed to load chat history', err);
+        setMessages([{
+          id: 'error-msg',
+          role: 'assistant',
+          error: 'Failed to load chat history.',
+        }]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    window.addEventListener('chat:selected', handler);
+    return () => window.removeEventListener('chat:selected', handler);
+  }, []);
+
   const validateJson = (text: string): any[] | null => {
     try {
       const parsed = JSON.parse(text);
@@ -220,6 +272,7 @@ export default function TestScriptPage() {
                         return;
                       }
                       setSelectedModel(model.id);
+                      localStorage.setItem('preferred_model', model.id);
                       setShowModelPicker(false);
                     }}
                     className={`w-full text-left px-4 py-3.5 rounded-2xl transition-all flex items-start justify-between gap-3 group
@@ -350,9 +403,8 @@ export default function TestScriptPage() {
             onChange={(e) => { setJsonInput(e.target.value); setJsonError(null); }}
             disabled={isLoading}
             rows={5}
-            className={`w-full p-4 bg-gray-50 border rounded-2xl outline-none resize-none font-mono text-xs text-gray-700 transition-all focus:bg-white disabled:opacity-50 ${
-              jsonError ? 'border-red-400 focus:ring-2 focus:ring-red-300' : 'border-gray-200 focus:ring-2 focus:ring-purple-500'
-            }`}
+            className={`w-full p-4 bg-gray-50 border rounded-2xl outline-none resize-none font-mono text-xs text-gray-700 transition-all focus:bg-white disabled:opacity-50 ${jsonError ? 'border-red-400 focus:ring-2 focus:ring-red-300' : 'border-gray-200 focus:ring-2 focus:ring-purple-500'
+              }`}
             placeholder={`Paste your test case JSON here, e.g.\n[\n  { "id": "TC-01", "scenario": "Login", "steps": [...], "expected": [...] },\n  ...\n]`}
           />
           {jsonInput && !jsonError && (

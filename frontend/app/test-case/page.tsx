@@ -6,7 +6,7 @@ import {
   Send, Bot, User, Loader2, FileText, Copy,
   Edit3, Check, X, FileSpreadsheet,
   Paperclip, ChevronDown, CheckCircle2,
-  FileUp, XCircle, Plus, AlertCircle, Cpu, Cloud, ChevronUp
+  FileUp, XCircle, Plus, AlertCircle, Cpu, Cloud, ChevronUp, Download
 } from 'lucide-react';
 import { TestCaseTable } from '@/components/testcase/TestCaseTable';
 import { GenerateScriptBubble } from '@/components/testcase/GenerateScriptBubble';
@@ -33,8 +33,14 @@ const MODELS: { id: ModelType; label: string; desc: string; badge: string; badge
 export default function TestCasePage() {
   const [selectedModel, setSelectedModel] = useState<ModelType>('local');
   const [showModelPicker, setShowModelPicker] = useState(false);
-  const [noHfKeyWarning, setNoHfKeyWarning] = useState(false);
+  useEffect(() => {
+    const savedModel = localStorage.getItem('preferred_model') as ModelType;
+    if (savedModel === 'local' || savedModel === 'cloud') {
+      setSelectedModel(savedModel);
+    }
+  }, []);
 
+  const [noHfKeyWarning, setNoHfKeyWarning] = useState(false);
   const [hasHfKey, setHasHfKey] = useState(false);
   useEffect(() => {
     const key = localStorage.getItem('hf_key');
@@ -47,7 +53,8 @@ export default function TestCasePage() {
     content: string,
     rawData?: any,
     columns?: string[],
-    attachedFile?: { name: string, size: number }
+    attachedFile?: { name: string, size: number },
+    fileChatId?: number,   // which chat this file belongs to (for history)
   }[]>([]);
 
   const [input, setInput] = useState("");
@@ -56,6 +63,7 @@ export default function TestCasePage() {
   const [editInput, setEditInput] = useState("");
 
   const [showCopyToast, setShowCopyToast] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [showColumnDropdown, setShowColumnDropdown] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [customColInput, setCustomColInput] = useState("");
@@ -70,51 +78,90 @@ export default function TestCasePage() {
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const [chatId, setChatId] = useState<number | null>(null);
 
-  // โหลด chat history เมื่อคลิกจาก SidebarRight
-  useEffect(() => {
-    const handler = async (e: Event) => {
-      const { chatId: selectedId } = (e as CustomEvent).detail;
-      setChatId(selectedId);
-      setMessages([]);
-      try {
-        const res = await fetch(`http://127.0.0.1:8000/api/chat/${selectedId}/history`);
-        if (!res.ok) return;
-        const history: { role: string; content: string }[] = await res.json();
-
-        const loadedMessages = history.map((msg, i) => {
-          if (msg.role === 'assistant') {
-            try {
-              const rawData = JSON.parse(msg.content);
-              return {
-                id: `history-${i}`,
-                role: 'assistant',
-                content: '### 📋 Generated Test Case',
-                rawData,
-                columns: Array.isArray(rawData?.cases) && rawData.cases.length > 0
-                  ? Object.keys(rawData.cases[0])
-                  : Object.keys(rawData),
-              };
-            } catch {
-              return { id: `history-${i}`, role: 'assistant', content: msg.content };
-            }
+  // helper: โหลด history จาก chatId
+  const loadHistory = async (id: number) => {
+    setMessages([]);
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/chat/${id}/history`);
+      if (!res.ok) return;
+      const history: any[] = await res.json();
+      const loadedMessages = history.map((msg, i) => {
+        if (msg.role === 'assistant') {
+          try {
+            const rawData = JSON.parse(msg.content);
+            return {
+              id: `history-${i}`,
+              role: 'assistant',
+              content: '### 📋 Generated Test Case',
+              rawData,
+              columns: Array.isArray(rawData?.cases) && rawData.cases.length > 0
+                ? Object.keys(rawData.cases[0])
+                : Object.keys(rawData),
+            };
+          } catch {
+            return { id: `history-${i}`, role: 'assistant', content: msg.content };
           }
-          return { id: `history-${i}`, role: msg.role, content: msg.content };
-        });
+        }
+        return {
+          id: `history-${i}`,
+          role: 'user',
+          content: msg.content,
+          attachedFile: msg.file_name ? { name: msg.file_name, size: msg.file_size || 0 } : undefined,
+          fileChatId: id,
+        };
+      });
+      setMessages(loadedMessages as any);
+    } catch (err) {
+      console.error('Failed to load chat history', err);
+    }
+  };
 
-        setMessages(loadedMessages as any);
-      } catch (err) {
-        console.error('Failed to load chat history', err);
-      }
-    };
-
-    window.addEventListener('chat:selected', handler);
-    return () => window.removeEventListener('chat:selected', handler);
+  // โหลด chat ล่าสุดอัตโนมัติตอนเปิดหน้า
+  useEffect(() => {
+    const lastChatId = localStorage.getItem('last_testcase_chat_id');
+    if (lastChatId) {
+      const id = Number(lastChatId);
+      setChatId(id);
+      // notify SidebarRight ให้ highlight
+      window.dispatchEvent(new CustomEvent('chat:restore', { detail: { chatId: id } }));
+      loadHistory(id);
+    }
   }, []);
+
+  // บันทึก chatId ทุกครั้งที่เปลี่ยน
+  useEffect(() => {
+    if (chatId) {
+      localStorage.setItem('last_testcase_chat_id', String(chatId));
+    } else {
+      localStorage.removeItem('last_testcase_chat_id');
+    }
+  }, [chatId]);
 
   const [userId, setUserId] = useState<number | null>(null);
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) setUserId(JSON.parse(userData).id);
+  }, []);
+
+  // รับ event เมื่อคลิก chat จาก SidebarRight
+  useEffect(() => {
+    const handleNewChat = () => {
+      setChatId(null);
+      setMessages([]);
+      localStorage.removeItem('last_testcase_chat_id');
+    };
+    window.addEventListener('chat:new', handleNewChat);
+    return () => window.removeEventListener('chat:new', handleNewChat);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { chatId: selectedId } = (e as CustomEvent).detail;
+      setChatId(selectedId);
+      loadHistory(selectedId);
+    };
+    window.addEventListener('chat:selected', handler);
+    return () => window.removeEventListener('chat:selected', handler);
   }, []);
 
   const scrollToBottom = () => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
@@ -135,6 +182,29 @@ export default function TestCasePage() {
     navigator.clipboard.writeText(text);
     setShowCopyToast(true);
     setTimeout(() => setShowCopyToast(false), 2000);
+  };
+
+  const handleOpenFile = async (fileChatId: number | null | undefined, fileName: string) => {
+    const id = fileChatId ?? chatId;
+    if (!id) return;
+    const url = `http://127.0.0.1:8000/api/chat/${id}/file/${encodeURIComponent(fileName)}`;
+    try {
+      const res = await fetch(url, { method: 'HEAD' });
+      if (res.status === 404) {
+        setFileError(`File "${fileName}" not found — it may have been deleted`);
+        setTimeout(() => setFileError(null), 3500);
+        return;
+      }
+      if (!res.ok) {
+        setFileError(`Failed to open file (${res.status})`);
+        setTimeout(() => setFileError(null), 3500);
+        return;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch {
+      setFileError('Cannot connect to server');
+      setTimeout(() => setFileError(null), 3500);
+    }
   };
 
   const startEdit = (id: string, content: string) => {
@@ -249,6 +319,7 @@ export default function TestCasePage() {
         setChatId(newChat.id);
       }
 
+      // Upload file to Backend (Backend should save it tied to the chat_id)
       if (currentFile) {
         const formData = new FormData();
         formData.append('file', currentFile);
@@ -259,7 +330,14 @@ export default function TestCasePage() {
       const response = await fetch('http://127.0.0.1:8000/api/chat/test-case', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: currentInput, chat_id: activeChatId, columns: selectedColumns, model: selectedModel }),
+        body: JSON.stringify({
+          text: currentInput,
+          chat_id: activeChatId,
+          columns: selectedColumns,
+          model: selectedModel,
+          file_name: currentFile ? currentFile.name : null,
+          file_size: currentFile ? currentFile.size : null,
+        }),
       });
 
       const data = await response.json();
@@ -288,13 +366,18 @@ export default function TestCasePage() {
           <CheckCircle2 size={18} /> Copied!
         </div>
       )}
+      {fileError && (
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 z-60 bg-red-500 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 font-bold animate-in fade-in slide-in-from-top-4 whitespace-nowrap">
+          <XCircle size={18} /> {fileError}
+        </div>
+      )}
 
       {/* Header */}
       <div className="p-6 border-b flex justify-between items-center bg-white">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><FileText size={24} /></div>
           <div>
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight">AI TestGen Full v1.0</h1>
+            <h1 className="text-xl font-bold text-gray-800 tracking-tight">AI Test Case Generator</h1>
             <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Mode: RAG Enabled</p>
           </div>
         </div>
@@ -320,7 +403,7 @@ export default function TestCasePage() {
               {noHfKeyWarning && (
                 <div className="mx-2 mb-2 px-3 py-2.5 bg-red-500/20 border border-red-500/40 rounded-xl flex items-center gap-2 animate-in fade-in">
                   <AlertCircle size={14} className="text-red-400 shrink-0" />
-                  <span className="text-red-400 text-xs font-bold">⚠️ ต้องเพิ่ม HuggingFace API Key ก่อน ไปที่ Profile Settings</span>
+                  <span className="text-red-400 text-xs font-bold">⚠️ HuggingFace API Key required — please add it in Profile Settings</span>
                 </div>
               )}
 
@@ -337,6 +420,7 @@ export default function TestCasePage() {
                         return;
                       }
                       setSelectedModel(model.id);
+                      localStorage.setItem('preferred_model', model.id);
                       setShowModelPicker(false);
                     }}
                     className={`w-full text-left px-4 py-3.5 rounded-2xl transition-all flex items-start justify-between gap-3 group
@@ -403,13 +487,22 @@ export default function TestCasePage() {
 
                 <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
                   <div className={`relative rounded-2xl p-4 shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'}`}>
+                    
+                    {/* ส่วนที่แสดงไฟล์แนบของ User */}
                     {msg.role === 'user' && msg.attachedFile && (
-                      <div className="mb-2 p-2 bg-white/20 rounded-lg flex items-center gap-2 text-[10px] font-bold border border-white/30 backdrop-blur-sm">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenFile(msg.fileChatId, msg.attachedFile!.name)}
+                        title="Open attached file"
+                        className="mb-2 p-2 bg-white/20 rounded-lg flex items-center gap-2 text-[10px] font-bold border border-white/30 backdrop-blur-sm hover:bg-white/30 transition-colors cursor-pointer w-full text-left"
+                      >
                         <FileUp size={12} />
                         <span className="truncate max-w-37.5">{msg.attachedFile.name}</span>
                         <span className="opacity-60">({(msg.attachedFile.size / 1024).toFixed(1)} KB)</span>
-                      </div>
+                        <Download size={11} className="ml-auto opacity-70 shrink-0" />
+                      </button>
                     )}
+                    
                     {editingId === msg.id ? (
                       <div className="flex flex-col gap-2 min-w-52">
                         <textarea value={editInput} onChange={(e) => setEditInput(e.target.value)} className="w-full p-2 rounded-lg bg-white/10 text-white outline-none border border-white/20" rows={3} autoFocus />
