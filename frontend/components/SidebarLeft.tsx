@@ -22,22 +22,33 @@ export default function SidebarLeft() {
     }
   }, []);
 
-
   const menuItems = [
     { name: 'Home', icon: House, path: '/' },
-    { name: 'Test Case', icon: FileText, path: '/test-case/' },
-    { name: 'Test Script', icon: Terminal, path: '/test-script/' },
-    { name: 'Profile', icon: UserCircle, path: '/profile/' },
+    { name: 'Test Case', icon: FileText, path: '/test-case' },
+    { name: 'Test Script', icon: Terminal, path: '/test-script' },
+    { name: 'Profile', icon: UserCircle, path: '/profile' },
   ];
 
+  // ✅ แก้ไขฟังก์ชัน handleLogout ตรงนี้
   const handleLogout = () => {
+    // 1. เคลียร์ข้อมูล User
     localStorage.removeItem('user');
+    localStorage.removeItem('hf_key');
+    
+    // 2. เคลียร์ Cache การจำแชทเก่าๆ ทิ้งให้หมด
+    localStorage.removeItem('last_testcase_chat_id');
+    localStorage.removeItem('preferred_model');
+    sessionStorage.clear(); // ล้าง session เผื่อมีค้าง
+    
+    // 3. เคลียร์ Cookie
     document.cookie = "isLoggedIn=; path=/; max-age=0";
-    router.push('/login');
+    
+    // 4. ใช้ window.location.href แทน router.push เพื่อบังคับล้าง State ทั้งหมดของ React
+    window.location.href = '/login';
   };
 
   const handleNewChat = (path: string) => {
-    if (path === '/test-case/' || path === '/test-script/') {
+    if (path === '/test-case' || path === '/test-script') {
       localStorage.removeItem('last_testcase_chat_id');
       window.dispatchEvent(new CustomEvent('chat:new'));
     }
@@ -53,7 +64,7 @@ export default function SidebarLeft() {
       <div className="space-y-2 flex-1">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.path;
+          const isActive = pathname === item.path || (pathname?.startsWith(item.path) && item.path !== '/');
 
           return (
             <button

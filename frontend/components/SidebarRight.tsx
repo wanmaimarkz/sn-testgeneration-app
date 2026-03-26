@@ -12,7 +12,7 @@ const API_BASE = 'http://127.0.0.1:8000/api';
 
 interface Chat {
   id: number;
-  name: string;           // backend uses "name" not "title"
+  name: string;           
   created_at: string;
   folder_id: number | null;
   user_id: number;
@@ -52,11 +52,11 @@ const fetchWithTimeout = (url: string, options?: RequestInit, ms = 8000) => {
 };
 
 const api = {
+  // ✅ กลับมาใช้ API แบบปกติ ไม่มี ?_t และ no-store
   getChats: (userId: number) =>
     fetchWithTimeout(`${API_BASE}/chat/user/${userId}`)
       .then(r => r.json()) as Promise<Chat[]>,
 
-  // ✅ แก้ไข: กลับมาใช้ /folder/ ให้ตรงกับ folder.py
   getFolders: (userId: number) =>
     fetchWithTimeout(`${API_BASE}/folder/user/${userId}`)
       .then(r => r.json()) as Promise<FolderItem[]>,
@@ -78,7 +78,6 @@ const api = {
       body: JSON.stringify({ folder_id: folderId }),
     }),
 
-  // ✅ แก้ไข: กลับมาใช้ /folder/
   createFolder: async (name: string, userId: number) => {
     const res = await fetch(`${API_BASE}/folder/`, {
       method: 'POST',
@@ -90,11 +89,9 @@ const api = {
     return data as FolderItem;
   },
 
-  // ✅ แก้ไข: กลับมาใช้ /folder/
   deleteFolder: (folderId: number) =>
     fetch(`${API_BASE}/folder/${folderId}`, { method: 'DELETE' }),
 
-  // ✅ แก้ไข: กลับมาใช้ /folder/
   renameFolder: (folderId: number, name: string) =>
     fetch(`${API_BASE}/folder/${folderId}/rename`, {
       method: 'PATCH',
@@ -159,11 +156,9 @@ function MoveToMenu({
   useEffect(() => {
     if (!anchorRef.current) return;
     const rect = anchorRef.current.getBoundingClientRect();
-    const menuWidth = 176; // w-44
-    // Check if opening to the right would overflow the viewport
+    const menuWidth = 176; 
     const spaceRight = window.innerWidth - rect.right;
     if (spaceRight < menuWidth) {
-      // Open to the left
       setPos({ top: rect.top, right: window.innerWidth - rect.left + 4 });
     } else {
       setPos({ top: rect.top, left: rect.right + 4 });
@@ -246,10 +241,10 @@ function ChatCard({
     }
     const rect = menuBtnRef.current?.getBoundingClientRect();
     if (rect) {
-      const menuWidth = 176; // w-44
+      const menuWidth = 176; 
       const spaceRight = window.innerWidth - rect.left;
       const spaceBelow = window.innerHeight - rect.bottom;
-      const menuHeight = 160; // approximate
+      const menuHeight = 160; 
       const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4;
       if (spaceRight < menuWidth) {
         setMenuPos({ top, right: window.innerWidth - rect.right });
@@ -413,7 +408,7 @@ function FolderSection({
     }
     const rect = folderMenuBtnRef.current?.getBoundingClientRect();
     if (rect) {
-      const menuWidth = 160; // w-40
+      const menuWidth = 160; 
       const spaceRight = window.innerWidth - rect.left;
       const spaceBelow = window.innerHeight - rect.bottom;
       const menuHeight = 90;
@@ -509,19 +504,37 @@ function FolderSection({
 
 // ─── Main Sidebar ─────────────────────────────────────────────────────────────
 
-export default function SidebarRight({ userId }: SidebarRightProps) {
+export default function SidebarRight({ userId: propUserId }: SidebarRightProps) {
   const pathname = usePathname();
   const [chats, setChats] = useState<Chat[]>([]);
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);  const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);  
+  const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
+  const [localUserId, setLocalUserId] = useState<number | null>(null);
+  const userId = propUserId || localUserId;
+
+  useEffect(() => {
+    const storedUserStr = localStorage.getItem('user');
+    if (storedUserStr) {
+      try {
+        const userData = JSON.parse(storedUserStr);
+        if (userData.id) {
+          setLocalUserId(userData.id);
+        }
+      } catch (e) {
+        console.error("Failed to parse user data", e);
+      }
+    }
+  }, []);
+
   // ── Fetch ───────────────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) return; 
     try {
       setLoading(true);
       setError(null);
@@ -609,14 +622,12 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
 
   // ── Event Listeners ─────────────────────────────────────────────────────────
 
-  // รับ event จาก page.tsx เมื่อสร้าง chat ใหม่
   useEffect(() => {
     const handler = () => fetchData();
     window.addEventListener('chat:created', handler);
     return () => window.removeEventListener('chat:created', handler);
   }, [fetchData]);
 
-  // restore selected chat เมื่อโหลดหน้าใหม่
   useEffect(() => {
     const handler = (e: Event) => {
       const { chatId } = (e as CustomEvent).detail;
@@ -626,14 +637,14 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
     return () => window.removeEventListener('chat:restore', handler);
   }, []);
 
-  // ล้าง Highlight เมื่อผู้ใช้กด New Chat (Test Case) จาก SidebarLeft
   useEffect(() => {
     const handleNewChat = () => {
       setSelectedChatId(null);
+      fetchData(); 
     };
     window.addEventListener('chat:new', handleNewChat);
     return () => window.removeEventListener('chat:new', handleNewChat);
-  }, []);
+  }, [fetchData]); 
 
   const unassignedChats = (chats ?? []).filter(c => c.folder_id === null);
 

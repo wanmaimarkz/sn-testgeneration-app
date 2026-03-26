@@ -38,8 +38,12 @@ export default function Dashboard() {
           return;
         }
 
-        // เรียก API ดึงประวัติแชทของ User คนนี้
-        const res = await fetch(`http://127.0.0.1:8000/api/chat/user/${user.id}`);
+        // ✅ เพิ่ม ?_t=${Date.now()} และ Header ตัด Cache 
+        const res = await fetch(`http://127.0.0.1:8000/api/chat/user/${user.id}?_t=${Date.now()}`, { 
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' }
+        });
+
         if (res.ok) {
           const data = await res.json();
           setTotalChats(data.length);
@@ -55,13 +59,19 @@ export default function Dashboard() {
     fetchRecentChats();
   }, []);
 
-  // ฟังก์ชันจัดการเมื่อคลิกประวัติแชท — navigate ตาม chat_type เหมือน SidebarRight
+  // ฟังก์ชันเปิดแชทใหม่ (กระตุ้น Sidebar ให้รีเซ็ต)
+  const handleNewNavigation = (path: string) => {
+    localStorage.removeItem('last_testcase_chat_id');
+    window.dispatchEvent(new CustomEvent('chat:new'));
+    router.push(path);
+  };
+
+  // ฟังก์ชันจัดการเมื่อคลิกประวัติแชท
   const handleChatClick = (chat: Chat) => {
     const targetPath = chat.chat_type === 'test_script' ? '/test-script' : '/test-case';
     router.push(`${targetPath}?chatId=${chat.id}`);
   };
 
-  // ฟังก์ชันแปลงวันที่ให้สวยงามอ่านง่าย
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     const dd = d.getDate().toString().padStart(2, '0');
@@ -82,24 +92,30 @@ export default function Dashboard() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
           {/* Card: Test Case */}
-          <Link href="/test-case" className="group p-8 bg-white border border-gray-200 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all duration-300">
+          <div 
+            onClick={() => handleNewNavigation('/test-case')} 
+            className="cursor-pointer group p-8 bg-white border border-gray-200 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all duration-300"
+          >
             <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
               <FileText size={28} />
             </div>
             <h2 className="text-2xl font-bold mb-2 text-gray-800">Test Case Generator</h2>
             <p className="text-gray-500 mb-6 text-sm">Create detailed test scenarios and plans.</p>
             <span className="text-blue-600 font-semibold inline-flex items-center gap-1">Get Started <ChevronRight size={16}/></span>
-          </Link>
+          </div>
 
           {/* Card: Test Script */}
-          <Link href="/test-script" className="group p-8 bg-white border border-gray-200 rounded-2xl hover:border-purple-500 hover:shadow-xl transition-all duration-300">
+          <div 
+            onClick={() => handleNewNavigation('/test-script')} 
+            className="cursor-pointer group p-8 bg-white border border-gray-200 rounded-2xl hover:border-purple-500 hover:shadow-xl transition-all duration-300"
+          >
             <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-purple-600 group-hover:text-white transition-colors">
               <Terminal size={28} />
             </div>
             <h2 className="text-2xl font-bold mb-2 text-gray-800">Test Script Generator</h2>
             <p className="text-gray-500 mb-6 text-sm">Generate automation code for Playwright.</p>
             <span className="text-purple-600 font-semibold inline-flex items-center gap-1">Get Started <ChevronRight size={16}/></span>
-          </Link>
+          </div>
         </div>
 
         {/* History Section */}
@@ -114,12 +130,12 @@ export default function Dashboard() {
               )}
             </h3>
             {totalChats > RECENT_LIMIT && (
-              <Link
-                href="/test-case"
-                className="text-xs font-bold text-blue-500 hover:text-blue-700 flex items-center gap-1 transition-colors"
+              <div
+                onClick={() => handleNewNavigation('/test-case')}
+                className="cursor-pointer text-xs font-bold text-blue-500 hover:text-blue-700 flex items-center gap-1 transition-colors"
               >
                 View all <ChevronRight size={13} />
-              </Link>
+              </div>
             )}
           </div>
           <div className="space-y-3">
