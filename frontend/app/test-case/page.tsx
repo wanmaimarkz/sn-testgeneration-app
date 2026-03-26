@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -33,6 +34,7 @@ const MODELS: { id: ModelType; label: string; desc: string; badge: string; badge
 export default function TestCasePage() {
   const [selectedModel, setSelectedModel] = useState<ModelType>('local');
   const [showModelPicker, setShowModelPicker] = useState(false);
+  
   useEffect(() => {
     const savedModel = localStorage.getItem('preferred_model') as ModelType;
     if (savedModel === 'local' || savedModel === 'cloud') {
@@ -42,6 +44,7 @@ export default function TestCasePage() {
 
   const [noHfKeyWarning, setNoHfKeyWarning] = useState(false);
   const [hasHfKey, setHasHfKey] = useState(false);
+  
   useEffect(() => {
     const key = localStorage.getItem('hf_key');
     setHasHfKey(!!key && key.startsWith('hf_'));
@@ -54,7 +57,7 @@ export default function TestCasePage() {
     rawData?: any,
     columns?: string[],
     attachedFile?: { name: string, size: number },
-    fileChatId?: number,   // which chat this file belongs to (for history)
+    fileChatId?: number, // ใช้ undefined แทน null เพื่อป้องกัน TS Error
   }[]>([]);
 
   const [input, setInput] = useState("");
@@ -76,9 +79,9 @@ export default function TestCasePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const modelPickerRef = useRef<HTMLDivElement>(null);
+  const columnPickerRef = useRef<HTMLDivElement>(null); 
   const [chatId, setChatId] = useState<number | null>(null);
 
-  // helper: โหลด history จาก chatId
   const loadHistory = async (id: number) => {
     setMessages([]);
     try {
@@ -116,19 +119,19 @@ export default function TestCasePage() {
     }
   };
 
-  // โหลด chat ล่าสุดอัตโนมัติตอนเปิดหน้า
-  useEffect(() => {
-    const lastChatId = localStorage.getItem('last_testcase_chat_id');
-    if (lastChatId) {
-      const id = Number(lastChatId);
-      setChatId(id);
-      // notify SidebarRight ให้ highlight
-      window.dispatchEvent(new CustomEvent('chat:restore', { detail: { chatId: id } }));
-      loadHistory(id);
-    }
-  }, []);
+  const searchParams = useSearchParams();
 
-  // บันทึก chatId ทุกครั้งที่เปลี่ยน
+  useEffect(() => {
+    const paramId = searchParams.get('chatId');
+    const lastChatId = localStorage.getItem('last_testcase_chat_id');
+    const resolvedId = paramId ? Number(paramId) : lastChatId ? Number(lastChatId) : null;
+    if (resolvedId) {
+      setChatId(resolvedId);
+      window.dispatchEvent(new CustomEvent('chat:restore', { detail: { chatId: resolvedId } }));
+      loadHistory(resolvedId);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (chatId) {
       localStorage.setItem('last_testcase_chat_id', String(chatId));
@@ -143,7 +146,6 @@ export default function TestCasePage() {
     if (userData) setUserId(JSON.parse(userData).id);
   }, []);
 
-  // รับ event เมื่อคลิก chat จาก SidebarRight
   useEffect(() => {
     const handleNewChat = () => {
       setChatId(null);
@@ -167,10 +169,14 @@ export default function TestCasePage() {
   const scrollToBottom = () => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
 
+  // Click Outside Handler สำหรับทั้ง Model Picker และ Column Dropdown
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (modelPickerRef.current && !modelPickerRef.current.contains(e.target as Node)) {
         setShowModelPicker(false);
+      }
+      if (columnPickerRef.current && !columnPickerRef.current.contains(e.target as Node)) {
+        setShowColumnDropdown(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -184,27 +190,16 @@ export default function TestCasePage() {
     setTimeout(() => setShowCopyToast(false), 2000);
   };
 
-  const handleOpenFile = async (fileChatId: number | null | undefined, fileName: string) => {
+  // เปิดไฟล์โดยตรง ไม่ต้องยิงเช็ค HEAD ป้องกันปัญหา CORS
+  const handleOpenFile = (fileChatId: number | null | undefined, fileName: string) => {
     const id = fileChatId ?? chatId;
-    if (!id) return;
-    const url = `http://127.0.0.1:8000/api/chat/${id}/file/${encodeURIComponent(fileName)}`;
-    try {
-      const res = await fetch(url, { method: 'HEAD' });
-      if (res.status === 404) {
-        setFileError(`File "${fileName}" not found — it may have been deleted`);
-        setTimeout(() => setFileError(null), 3500);
-        return;
-      }
-      if (!res.ok) {
-        setFileError(`Failed to open file (${res.status})`);
-        setTimeout(() => setFileError(null), 3500);
-        return;
-      }
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } catch {
-      setFileError('Cannot connect to server');
+    if (!id) {
+      setFileError(`Cannot determine Chat ID for file: ${fileName}`);
       setTimeout(() => setFileError(null), 3500);
+      return;
     }
+    const url = `http://127.0.0.1:8000/api/chat/${id}/file/${encodeURIComponent(fileName)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const startEdit = (id: string, content: string) => {
@@ -290,17 +285,19 @@ export default function TestCasePage() {
     if (!input.trim() && !selectedFile) return;
     if (!userId) return;
 
-    const fileToAttach = selectedFile ? { name: selectedFile.name, size: selectedFile.size } : undefined;
-
-    setMessages(prev => [...prev, {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input,
-      attachedFile: fileToAttach
-    }]);
-
     const currentInput = input;
     const currentFile = selectedFile;
+    const fileToAttach = currentFile ? { name: currentFile.name, size: currentFile.size } : undefined;
+    
+    // สร้าง ID ชั่วคราวสำหรับการแสดงผล
+    const tempMessageId = Date.now().toString();
+
+    setMessages(prev => [...prev, {
+      id: tempMessageId,
+      role: 'user',
+      content: currentInput,
+      attachedFile: fileToAttach
+    }]);
 
     setInput("");
     setSelectedFile(null);
@@ -308,25 +305,41 @@ export default function TestCasePage() {
 
     try {
       let activeChatId = chatId;
+
+      // 1. ตรวจสอบแชท หากไม่มีสร้างใหม่ก่อน
       if (!activeChatId) {
         const chatRes = await fetch('http://127.0.0.1:8000/api/chat/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: currentInput.slice(0, 50), user_id: userId }),
+          body: JSON.stringify({ 
+            name: currentInput.slice(0, 50) || "New Test Case Chat", 
+            user_id: userId, 
+            chat_type: 'test_case' 
+          }),
         });
         const newChat = await chatRes.json();
         activeChatId = newChat.id;
-        setChatId(newChat.id);
+        setChatId(activeChatId);
+
+        // ใส่ ?? undefined เพื่อแก้ปัญหา TS Error fileChatId: number | undefined
+        setMessages(prev => prev.map(msg => msg.id === tempMessageId ? { ...msg, fileChatId: activeChatId ?? undefined } : msg));
+      } else {
+        setMessages(prev => prev.map(msg => msg.id === tempMessageId ? { ...msg, fileChatId: activeChatId ?? undefined } : msg));
       }
 
-      // Upload file to Backend (Backend should save it tied to the chat_id)
-      if (currentFile) {
+      // 2. Upload ไฟล์
+      if (currentFile && activeChatId) {
         const formData = new FormData();
         formData.append('file', currentFile);
         formData.append('chat_id', String(activeChatId));
-        await fetch('http://127.0.0.1:8000/api/chat/upload', { method: 'POST', body: formData });
+        const uploadRes = await fetch('http://127.0.0.1:8000/api/chat/upload', { 
+          method: 'POST', 
+          body: formData 
+        });
+        if (!uploadRes.ok) throw new Error("File upload failed");
       }
 
+      // 3. Generate Test Case
       const response = await fetch('http://127.0.0.1:8000/api/chat/test-case', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -476,8 +489,11 @@ export default function TestCasePage() {
             <p className="text-sm font-bold tracking-wide">Describe the testcase or feature you want to create.</p>
           </div>
         )}
+        
         {(() => {
+          // คำนวณหา index ของข้อความ user ล่าสุดเพื่อแสดงปุ่ม Edit
           const lastUserIndex = messages.reduce((acc, m, i) => m.role === 'user' ? i : acc, -1);
+          
           return messages.map((msg, index) => (
             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group animate-in fade-in duration-500`}>
               <div className={`flex gap-4 max-w-[95%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -488,7 +504,7 @@ export default function TestCasePage() {
                 <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
                   <div className={`relative rounded-2xl p-4 shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'}`}>
                     
-                    {/* ส่วนที่แสดงไฟล์แนบของ User */}
+                    {/* File Attachment แสดง Size ตาม Version เก่า */}
                     {msg.role === 'user' && msg.attachedFile && (
                       <button
                         type="button"
@@ -521,12 +537,13 @@ export default function TestCasePage() {
                     )}
                   </div>
 
-                  {/* Toolbar & Info Section */}
+                  {/* Toolbar & Info Section ตาม Version เก่าเป๊ะๆ */}
                   <div className={`flex items-center mt-1 px-2 ${msg.role === 'user' ? 'flex-row-reverse justify-between' : 'justify-between'}`}>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                       {msg.role === 'user' ? 'YOU' : 'AI ASSISTANT'}
                     </span>
 
+                    {/* User Tools (Copy & Edit) */}
                     {msg.role === 'user' && (
                       <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <button onClick={() => handleCopy(msg.content)} className="text-gray-400 hover:text-blue-600"><Copy size={14} /></button>
@@ -536,10 +553,13 @@ export default function TestCasePage() {
                       </div>
                     )}
 
+                    {/* Assistant Tools (Copy JSON, CSV, Generate Script) */}
                     {msg.role === 'assistant' && (
                       <div className="flex items-baseline gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ml-auto">
                         <div className="flex items-center gap-3 pr-4 mr-1">
-                          <button onClick={() => handleCopy(msg.rawData ? JSON.stringify(msg.rawData?.cases ?? msg.rawData, null, 2) : msg.content)} className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors uppercase"><Copy size={14} /> Copy JSON</button>
+                          <button onClick={() => handleCopy(msg.rawData ? JSON.stringify(msg.rawData?.cases ?? msg.rawData, null, 2) : msg.content)} className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors uppercase">
+                            <Copy size={14} /> Copy JSON
+                          </button>
                         </div>
                         {msg.rawData && (
                           <>
@@ -592,7 +612,7 @@ export default function TestCasePage() {
           </button>
           <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={(e) => e.target.files && setSelectedFile(e.target.files[0])} />
 
-          <div className="relative">
+          <div className="relative" ref={columnPickerRef}>
             <button type="button" onClick={() => setShowColumnDropdown(!showColumnDropdown)} className="px-4 py-3.5 bg-gray-100 text-gray-700 rounded-2xl font-bold text-sm flex items-center gap-2 border border-gray-200">
               Columns ({selectedColumns.length}) <ChevronDown size={16} />
             </button>

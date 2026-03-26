@@ -11,12 +11,16 @@ interface Chat {
   created_at: string;
   folder_id: number | null;
   user_id: number;
+  chat_type: 'test_case' | 'test_script';
 }
 
 export default function Dashboard() {
   const router = useRouter();
   const [recentChats, setRecentChats] = useState<Chat[]>([]);
+  const [totalChats, setTotalChats] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+
+  const RECENT_LIMIT = 4;
 
   // ฟังก์ชันดึงประวัติแชทล่าสุดจาก API
   useEffect(() => {
@@ -38,8 +42,8 @@ export default function Dashboard() {
         const res = await fetch(`http://127.0.0.1:8000/api/chat/user/${user.id}`);
         if (res.ok) {
           const data = await res.json();
-          // นำมาแสดงแค่ 5 รายการล่าสุด
-          setRecentChats(data.slice(0, 5));
+          setTotalChats(data.length);
+          setRecentChats(data.slice(0, RECENT_LIMIT));
         }
       } catch (error) {
         console.error("Failed to fetch recent chats", error);
@@ -51,11 +55,10 @@ export default function Dashboard() {
     fetchRecentChats();
   }, []);
 
-  // ฟังก์ชันจัดการเมื่อคลิกประวัติแชท
-  const handleChatClick = (chatId: number) => {
-    // บันทึก ID ลง LocalStorage เพื่อให้หน้า /test-case โหลดประวัติขึ้นมา
-    localStorage.setItem('last_testcase_chat_id', String(chatId));
-    router.push('/test-case');
+  // ฟังก์ชันจัดการเมื่อคลิกประวัติแชท — navigate ตาม chat_type เหมือน SidebarRight
+  const handleChatClick = (chat: Chat) => {
+    const targetPath = chat.chat_type === 'test_script' ? '/test-script' : '/test-case';
+    router.push(`${targetPath}?chatId=${chat.id}`);
   };
 
   // ฟังก์ชันแปลงวันที่ให้สวยงามอ่านง่าย
@@ -84,7 +87,7 @@ export default function Dashboard() {
               <FileText size={28} />
             </div>
             <h2 className="text-2xl font-bold mb-2 text-gray-800">Test Case Generator</h2>
-            <p className="text-gray-500 mb-6 text-sm">Create detailed test scenarios and plans using Llama 3.2.</p>
+            <p className="text-gray-500 mb-6 text-sm">Create detailed test scenarios and plans.</p>
             <span className="text-blue-600 font-semibold inline-flex items-center gap-1">Get Started <ChevronRight size={16}/></span>
           </Link>
 
@@ -94,16 +97,31 @@ export default function Dashboard() {
               <Terminal size={28} />
             </div>
             <h2 className="text-2xl font-bold mb-2 text-gray-800">Test Script Generator</h2>
-            <p className="text-gray-500 mb-6 text-sm">Generate automation code for Cypress or Selenium.</p>
+            <p className="text-gray-500 mb-6 text-sm">Generate automation code for Playwright.</p>
             <span className="text-purple-600 font-semibold inline-flex items-center gap-1">Get Started <ChevronRight size={16}/></span>
           </Link>
         </div>
 
         {/* History Section */}
         <div className="bg-gray-50/50 rounded-2xl p-6 border border-gray-100">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Clock size={20} className="text-gray-400" /> Recent History
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <Clock size={20} className="text-gray-400" /> Recent History
+              {totalChats > 0 && (
+                <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                  {totalChats}
+                </span>
+              )}
+            </h3>
+            {totalChats > RECENT_LIMIT && (
+              <Link
+                href="/test-case"
+                className="text-xs font-bold text-blue-500 hover:text-blue-700 flex items-center gap-1 transition-colors"
+              >
+                View all <ChevronRight size={13} />
+              </Link>
+            )}
+          </div>
           <div className="space-y-3">
             {isLoading ? (
               <div className="flex items-center justify-center py-6 text-gray-400">
@@ -113,19 +131,41 @@ export default function Dashboard() {
               recentChats.map((chat) => (
                 <div 
                   key={chat.id}
-                  onClick={() => handleChatClick(chat.id)}
+                  onClick={() => handleChatClick(chat)}
                   className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-10 h-10 bg-blue-50 text-blue-500 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                      <MessageCircle size={20} />
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                      chat.chat_type === 'test_script'
+                        ? 'bg-purple-50 text-purple-500 group-hover:bg-purple-500 group-hover:text-white'
+                        : 'bg-blue-50 text-blue-500 group-hover:bg-blue-500 group-hover:text-white'
+                    }`}>
+                      {chat.chat_type === 'test_script'
+                        ? <Terminal size={20} />
+                        : <FileText size={20} />
+                      }
                     </div>
                     <div className="truncate">
-                      <p className="font-bold text-gray-700 truncate group-hover:text-blue-700 transition-colors">{chat.name}</p>
-                      <p className="text-xs text-gray-400">{formatDate(chat.created_at)}</p>
+                      <p className={`font-bold truncate transition-colors ${
+                        chat.chat_type === 'test_script'
+                          ? 'text-gray-700 group-hover:text-purple-700'
+                          : 'text-gray-700 group-hover:text-blue-700'
+                      }`}>{chat.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
+                          chat.chat_type === 'test_script'
+                            ? 'bg-purple-100 text-purple-600'
+                            : 'bg-blue-100 text-blue-600'
+                        }`}>
+                          {chat.chat_type === 'test_script' ? 'Script' : 'Case'}
+                        </span>
+                        <p className="text-xs text-gray-400">{formatDate(chat.created_at)}</p>
+                      </div>
                     </div>
                   </div>
-                  <ChevronRight size={18} className="text-gray-300 group-hover:text-blue-500 transition-colors" />
+                  <ChevronRight size={18} className={`transition-colors text-gray-300 ${
+                    chat.chat_type === 'test_script' ? 'group-hover:text-purple-500' : 'group-hover:text-blue-500'
+                  }`} />
                 </div>
               ))
             ) : (

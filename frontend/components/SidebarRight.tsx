@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   EllipsisVertical, FolderPlus, MessageCircle, Pencil,
-  ArrowRightLeft, Trash2, Loader2, Folder, Check, X, ChevronRight, ChevronDown,
+  ArrowRightLeft, Trash2, Loader2, Folder, Check, X, ChevronRight, ChevronDown, Terminal, FileText,
 } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8000/api';
@@ -16,6 +16,7 @@ interface Chat {
   created_at: string;
   folder_id: number | null;
   user_id: number;
+  chat_type: 'test_case' | 'test_script';
 }
 
 interface FolderItem {
@@ -55,6 +56,7 @@ const api = {
     fetchWithTimeout(`${API_BASE}/chat/user/${userId}`)
       .then(r => r.json()) as Promise<Chat[]>,
 
+  // ✅ แก้ไข: กลับมาใช้ /folder/ ให้ตรงกับ folder.py
   getFolders: (userId: number) =>
     fetchWithTimeout(`${API_BASE}/folder/user/${userId}`)
       .then(r => r.json()) as Promise<FolderItem[]>,
@@ -76,6 +78,7 @@ const api = {
       body: JSON.stringify({ folder_id: folderId }),
     }),
 
+  // ✅ แก้ไข: กลับมาใช้ /folder/
   createFolder: async (name: string, userId: number) => {
     const res = await fetch(`${API_BASE}/folder/`, {
       method: 'POST',
@@ -87,9 +90,11 @@ const api = {
     return data as FolderItem;
   },
 
+  // ✅ แก้ไข: กลับมาใช้ /folder/
   deleteFolder: (folderId: number) =>
     fetch(`${API_BASE}/folder/${folderId}`, { method: 'DELETE' }),
 
+  // ✅ แก้ไข: กลับมาใช้ /folder/
   renameFolder: (folderId: number, name: string) =>
     fetch(`${API_BASE}/folder/${folderId}/rename`, {
       method: 'PATCH',
@@ -124,7 +129,7 @@ function InlineRename({
           if (e.key === 'Enter') { e.preventDefault(); onConfirm(val.trim()); }
           if (e.key === 'Escape') onCancel();
         }}
-        className="flex-1 text-sm border border-blue-300 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-blue-200 min-w-0"
+        className="flex-1 text-sm border border-blue-300 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-blue-200 min-w-0 text-gray-500"
       />
       <button type="button" onClick={() => onConfirm(val.trim())} className="text-green-500 hover:text-green-600 p-0.5">
         <Check width={14} />
@@ -275,16 +280,37 @@ function ChatCard({
           <button
             onClick={() => {
               onSelect?.(chat.id);
-              window.dispatchEvent(new CustomEvent('chat:selected', { detail: { chatId: chat.id } }));
+              const targetPath = chat.chat_type === 'test_script' ? '/test-script' : '/test-case';
+              if (window.location.pathname !== targetPath) {
+                window.location.href = targetPath + '?chatId=' + chat.id;
+              } else {
+                window.dispatchEvent(new CustomEvent('chat:selected', { detail: { chatId: chat.id } }));
+              }
             }}
             className="flex items-center gap-3 text-left w-full cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-blue-50 shrink-0">
-              <MessageCircle className="w-4 h-4 text-blue-500" />
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+              chat.chat_type === 'test_script' ? 'bg-purple-50' : 'bg-blue-50'
+            }`}>
+              {chat.chat_type === 'test_script'
+                ? <Terminal className="w-4 h-4 text-purple-500" />
+                : <FileText className="w-4 h-4 text-blue-500" />
+              }
             </div>
             <div className="truncate flex-1 min-w-0">
-              <p className={`text-sm font-semibold truncate ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>{chat.name}</p>
-              <p className="text-[10px] text-gray-400 font-medium">{formatDate(chat.created_at)}</p>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <p className={`text-sm font-semibold truncate ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>{chat.name}</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
+                  chat.chat_type === 'test_script'
+                    ? 'bg-purple-100 text-purple-600'
+                    : 'bg-blue-100 text-blue-600'
+                }`}>
+                  {chat.chat_type === 'test_script' ? 'Script' : 'Case'}
+                </span>
+                <p className="text-[10px] text-gray-400 font-medium">{formatDate(chat.created_at)}</p>
+              </div>
             </div>
           </button>
         )}

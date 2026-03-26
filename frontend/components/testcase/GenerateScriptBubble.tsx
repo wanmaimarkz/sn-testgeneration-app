@@ -1,8 +1,8 @@
 // components/testcase/GenerateScriptBubble.tsx
 "use client";
 import { useState, useEffect, useRef } from 'react';
-import { Terminal, Loader2, ChevronDown, ChevronUp, Download, Cpu, Cloud, Check, AlertCircle } from 'lucide-react';
-import { CodeBlock } from '@/components/testscript/CodeBlock';
+import { useRouter } from 'next/navigation';
+import { Terminal, ChevronDown, ChevronUp, Cpu, Cloud, Check, AlertCircle } from 'lucide-react';
 
 type ModelType = 'local' | 'cloud';
 
@@ -14,21 +14,11 @@ const MODELS: { id: ModelType; label: string; icon: React.ReactNode }[] = [
 interface GenerateScriptBubbleProps {
   rawData: any;
   chatId: number | null;
-  model: string; // default model passed from parent (used as initial value)
+  model: string;
 }
 
 export function GenerateScriptBubble({ rawData, chatId, model: defaultModel }: GenerateScriptBubbleProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [code, setCode] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
-  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showError = (msg: string) => {
-    setError(msg);
-    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-    errorTimerRef.current = setTimeout(() => setError(null), 4000);
-  };
+  const router = useRouter();
 
   // ── Model picker state ──
   const [selectedModel, setSelectedModel] = useState<ModelType>(
@@ -55,9 +45,7 @@ export function GenerateScriptBubble({ rawData, chatId, model: defaultModel }: G
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleGenerate = async () => {
-    if (!chatId) return;
-
+  const handleGenerate = () => {
     // Guard: cloud requires key
     if (selectedModel === 'cloud' && !hasHfKey) {
       setShowNoKeyWarning(true);
@@ -65,41 +53,25 @@ export function GenerateScriptBubble({ rawData, chatId, model: defaultModel }: G
       return;
     }
 
+    // Normalise to array
     const cases = Array.isArray(rawData?.cases)
       ? rawData.cases
       : Array.isArray(rawData)
         ? rawData
         : [rawData];
 
-    setIsLoading(true);
-    setError(null);
+    // Store payload in sessionStorage so test-script page can pick it up
+    sessionStorage.setItem(
+      'testscript_autorun',
+      JSON.stringify({
+        json: JSON.stringify(cases),   // the raw JSON string to put into the textarea
+        model: selectedModel,          // pre-select the right model
+        sourceChatId: chatId,          // optional: for reference / future use
+      })
+    );
 
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/chat/test-script', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ test_cases: cases, chat_id: chatId, model: selectedModel }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || 'Generation failed');
-      setCode(data.code);
-      setExpanded(true);
-    } catch (err: any) {
-      showError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDownload = () => {
-    if (!code) return;
-    const blob = new Blob([code], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'test.spec.ts';
-    a.click();
-    URL.revokeObjectURL(url);
+    // Navigate to test-script page — a new chat will be created there automatically
+    router.push('/test-script');
   };
 
   return (
@@ -172,52 +144,15 @@ export function GenerateScriptBubble({ rawData, chatId, model: defaultModel }: G
           )}
         </div>
 
-        {/* Primary: Generate button (shown when no code yet) */}
-        {!code && (
-          <button
-            onClick={handleGenerate}
-            disabled={isLoading || !chatId}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-50 hover:bg-purple-100 active:scale-95 text-purple-700 rounded-full text-xs font-bold border border-purple-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            {isLoading ? (
-              <><Loader2 size={12} className="animate-spin" />Generating Script...</>
-            ) : (
-              <><Terminal size={12} />Generate Test Script</>
-            )}
-          </button>
-        )}
-
-        {/* Re-generate + toggle after code exists */}
-        {code && (
-          <>
-            <button
-              onClick={() => setExpanded(v => !v)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-full text-xs font-bold transition-all shadow-sm active:scale-95"
-            >
-              <Terminal size={12} />
-              {expanded ? 'Hide Script' : 'Show Script'}
-              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
-            <button
-              onClick={handleGenerate}
-              disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-xs font-bold transition-all disabled:opacity-50"
-            >
-              {isLoading ? <Loader2 size={12} className="animate-spin" /> : '↻'}
-              Regenerate
-            </button>
-            {expanded && (
-              <button
-                onClick={handleDownload}
-                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-xs font-bold transition-all ml-auto"
-              >
-                <Download size={12} /> .spec.ts
-              </button>
-            )}
-          </>
-        )}
-
-
+        {/* Generate button — always shown (navigates to test-script) */}
+        <button
+          onClick={handleGenerate}
+          disabled={!chatId}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-50 hover:bg-purple-100 active:scale-95 text-purple-700 rounded-full text-xs font-bold border border-purple-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+        >
+          <Terminal size={12} />
+          Generate Test Script
+        </button>
       </div>
 
       {/* No Key Warning */}
@@ -227,27 +162,6 @@ export function GenerateScriptBubble({ rawData, chatId, model: defaultModel }: G
           <span className="text-xs font-bold text-red-500">
             HuggingFace API Key required — add it in Profile Settings.
           </span>
-        </div>
-      )}
-
-      {/* Floating Error Toast */}
-      {error && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-100 flex items-center gap-2.5 bg-red-600 text-white px-5 py-3 rounded-2xl shadow-2xl font-bold text-xs animate-in fade-in slide-in-from-bottom-4 max-w-sm w-max">
-          <AlertCircle size={15} className="shrink-0" />
-          <span className="leading-snug">{error}</span>
-        </div>
-      )}
-
-      {/* Expanded Code Block */}
-      {code && expanded && (
-        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-          <div className="flex items-center gap-2 mb-2 px-1">
-            <Terminal size={12} className="text-purple-500" />
-            <span className="text-[11px] font-black text-purple-500 uppercase tracking-widest">
-              Playwright Test Script
-            </span>
-          </div>
-          <CodeBlock code={code} language="typescript" />
         </div>
       )}
     </div>

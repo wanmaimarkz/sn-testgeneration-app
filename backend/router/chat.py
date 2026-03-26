@@ -48,6 +48,7 @@ class ChatMove(BaseModel):
 class ChatCreate(BaseModel):
     name: str
     user_id: int
+    chat_type: str = "test_case"  # "test_case" | "test_script"
 
 
 class ChatRename(BaseModel):
@@ -136,7 +137,7 @@ def health_check():
 @router.post("/", status_code=201)
 def create_new_chat(chat_data: ChatCreate, session: Session = Depends(get_db_session)):
     """Creates a fresh, empty chat session."""
-    new_chat = Chat(name=chat_data.name, user_id=chat_data.user_id)
+    new_chat = Chat(name=chat_data.name, user_id=chat_data.user_id, chat_type=chat_data.chat_type)
     session.add(new_chat)
     session.commit()
     session.refresh(new_chat)

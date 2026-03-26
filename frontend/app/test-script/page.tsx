@@ -1,8 +1,10 @@
 "use client";
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Terminal, Loader2, Copy, Download, Trash2,
-  Code2, ChevronDown, AlertCircle, Cpu, Cloud, Check, ChevronUp
+  Code2, ChevronDown, AlertCircle, Cpu, Cloud, Check, ChevronUp,
+  User, Bot // เพิ่ม Import User และ Bot
 } from 'lucide-react';
 import { CodeBlock } from '@/components/testscript/CodeBlock';
 
@@ -49,6 +51,13 @@ export default function TestScriptPage() {
 
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+      const savedModel = localStorage.getItem('preferred_model') as ModelType;
+      if (savedModel === 'local' || savedModel === 'cloud') {
+        setSelectedModel(savedModel);
+      }
+    }, []);
 
   // Check for HF Key and User Info
   useEffect(() => {
@@ -89,20 +98,18 @@ export default function TestScriptPage() {
 
         const history: { role: string; content: string }[] = await res.json();
 
-        // 🛠️ แก้ไขการ Map ข้อมูลตรงนี้ให้ตรงกับตัวแปรที่ใช้ Render ใน UI
         const loadedMessages: Message[] = history.map((msg, i) => {
           if (msg.role === 'assistant') {
             return {
               id: `history-${i}`,
               role: 'assistant',
-              code: msg.content, // ใช้ `code` สำหรับผลลัพธ์จาก AI
+              code: msg.content,
             };
           }
-          // ฝั่ง user (ส่วนใหญ่ส่งเป็น JSON input เข้ามา)
           return {
             id: `history-${i}`,
             role: 'user',
-            jsonInput: msg.content, // ใช้ `jsonInput` สำหรับ input ของผู้ใช้
+            jsonInput: msg.content,
           };
         });
 
@@ -124,6 +131,30 @@ export default function TestScriptPage() {
     return () => window.removeEventListener('chat:selected', handler);
   }, []);
 
+  const searchParams = useSearchParams();
+
+  // Load chat from ?chatId= query param (navigated from sidebar)
+  useEffect(() => {
+    const paramId = searchParams.get('chatId');
+    if (!paramId) return;
+    const id = Number(paramId);
+    setChatId(id);
+    window.dispatchEvent(new CustomEvent('chat:restore', { detail: { chatId: id } }));
+    setMessages([]);
+    setIsLoading(true);
+    fetch(`http://127.0.0.1:8000/api/chat/${id}/history`)
+      .then(r => r.json())
+      .then((history: { role: string; content: string }[]) => {
+        setMessages(history.map((msg, i) => ({
+          id: `init-${i}`,
+          role: msg.role as 'user' | 'assistant',
+          ...(msg.role === 'assistant' ? { code: msg.content } : { jsonInput: msg.content }),
+        })));
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
+  }, []);
+
   const validateJson = (text: string): any[] | null => {
     try {
       const parsed = JSON.parse(text);
@@ -140,31 +171,32 @@ export default function TestScriptPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ── Core submit logic — shared by manual form and auto-run ──
+  const submitJson = useCallback(async (
+    rawText: string,
+    overrideModel?: ModelType,
+    overrideUserId?: number | null,
+  ) => {
     setJsonError(null);
-
-    const trimmed = jsonInput.trim();
+    const trimmed = rawText.trim();
     if (!trimmed) return;
 
     const cases = validateJson(trimmed);
     if (!cases) return;
 
-    const userMsgId = Date.now().toString();
-    setMessages(prev => [...prev, {
-      id: userMsgId,
-      role: 'user',
-      jsonInput: trimmed,
-    }]);
+    const activeModel  = overrideModel  ?? selectedModel;
+    const activeUserId = overrideUserId !== undefined ? overrideUserId : userId;
+
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', jsonInput: trimmed }]);
     setIsLoading(true);
 
     try {
       let activeChatId = chatId;
-      if (!activeChatId && userId) {
+      if (!activeChatId && activeUserId) {
         const chatRes = await fetch('http://127.0.0.1:8000/api/chat/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: `Script Session – ${new Date().toLocaleTimeString()}`, user_id: userId }),
+          body: JSON.stringify({ name: `Script Session – ${new Date().toLocaleTimeString()}`, user_id: activeUserId, chat_type: 'test_script' }),
         });
         const newChat = await chatRes.json();
         activeChatId = newChat.id;
@@ -174,35 +206,47 @@ export default function TestScriptPage() {
       const response = await fetch('http://127.0.0.1:8000/api/chat/test-script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          test_cases: cases,
-          chat_id: activeChatId,
-          model: selectedModel,
-        }),
+        body: JSON.stringify({ test_cases: cases, chat_id: activeChatId, model: activeModel }),
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Generation failed');
 
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        code: data.code,
-      }]);
-
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', code: data.code }]);
       setJsonInput('');
     } catch (err: any) {
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        error: err.message,
-      }]);
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', error: err.message }]);
     } finally {
       setIsLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedModel, userId, chatId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitJson(jsonInput);
   };
 
-  const handleDelete = (id: string) => setMessages(prev => prev.filter(m => m.id !== id));
+  // ── Auto-run: pick up payload left by GenerateScriptBubble ──
+  useEffect(() => {
+    if (userId === null) return;
+
+    const raw = sessionStorage.getItem('testscript_autorun');
+    if (!raw) return;
+    sessionStorage.removeItem('testscript_autorun'); // consume immediately
+
+    try {
+      const { json, model } = JSON.parse(raw) as { json: string; model: ModelType; sourceChatId: number | null };
+
+      if (model === 'local' || model === 'cloud') setSelectedModel(model);
+      setJsonInput(json); // pre-fill textarea for visual feedback
+      submitJson(json, model, userId);
+    } catch {
+      // malformed payload — ignore
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
 
   const handleDownload = (code: string) => {
     const blob = new Blob([code], { type: 'text/plain' });
@@ -324,71 +368,73 @@ export default function TestScriptPage() {
           </div>
         )}
 
-        {messages.map(msg => (
-          <div key={msg.id} className="animate-in fade-in duration-500 group">
-            {msg.role === 'user' && msg.jsonInput && (
-              <div className="flex justify-end mb-2">
-                <div className="max-w-[85%] relative">
-                  <div className="bg-purple-600 text-white rounded-2xl rounded-tr-none p-4 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-70">Test Case JSON</p>
-                    <pre className="text-xs font-mono overflow-x-auto max-h-32 whitespace-pre leading-relaxed opacity-90">
-                      {prettyJson(msg.jsonInput).slice(0, 400)}{prettyJson(msg.jsonInput).length > 400 ? '\n...' : ''}
-                    </pre>
-                  </div>
-                  <div className="flex justify-end mt-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => handleDelete(msg.id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 size={13} /></button>
-                  </div>
-                </div>
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group animate-in fade-in duration-500`}>
+            <div className={`flex gap-4 max-w-[95%] w-full ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+              
+              {/* Avatar */}
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border shadow-sm ${msg.role === 'user' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white border-gray-200 text-purple-600'}`}>
+                {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
               </div>
-            )}
 
-            {msg.role === 'assistant' && (
-              <div className="flex justify-start">
-                <div className="max-w-[95%] w-full">
-                  {msg.error ? (
-                    <div className="flex items-start gap-3 bg-red-50 border border-red-100 text-red-600 rounded-2xl rounded-tl-none p-4">
-                      <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-widest mb-1">Error</p>
-                        <p className="text-sm font-medium">{msg.error}</p>
-                      </div>
-                    </div>
-                  ) : msg.code ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-2">
-                          <Terminal size={13} className="text-purple-500" />
-                          <span className="text-[11px] font-black text-purple-500 uppercase tracking-widest">Playwright Script</span>
+              {/* Message Content */}
+              <div className={`flex flex-col gap-1 min-w-0 overflow-hidden ${msg.role === 'user' ? 'w-auto' : 'w-full'}`}>
+                <div className={`relative rounded-2xl p-4 shadow-sm ${msg.role === 'user' ? 'bg-purple-600 text-white rounded-tr-none' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none w-full'}`}>
+                  
+                  {msg.role === 'user' && msg.jsonInput && (
+                    <>
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-70">Test Case JSON</p>
+                      <pre className="text-xs font-mono overflow-x-auto max-h-32 whitespace-pre leading-relaxed opacity-90">
+                        {prettyJson(msg.jsonInput).slice(0, 400)}{prettyJson(msg.jsonInput).length > 400 ? '\n...' : ''}
+                      </pre>
+                    </>
+                  )}
+
+                  {msg.role === 'assistant' && (
+                    <>
+                      {msg.error ? (
+                        <div className="flex items-start gap-3 bg-red-50 border border-red-100 text-red-600 rounded-2xl p-4">
+                          <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-widest mb-1">Error</p>
+                            <p className="text-sm font-medium">{msg.error}</p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => { navigator.clipboard.writeText(msg.code!); }}
-                            className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-purple-600 uppercase transition-colors"
-                          >
-                            <Copy size={12} /> Copy
-                          </button>
-                          <button
-                            onClick={() => handleDownload(msg.code!)}
-                            className="flex items-center gap-1 text-[10px] font-bold text-purple-600 hover:text-purple-800 uppercase transition-colors"
-                          >
-                            <Download size={12} /> .spec.ts
-                          </button>
-                          <button onClick={() => handleDelete(msg.id)} className="text-gray-300 hover:text-red-400 transition-colors">
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                      <CodeBlock code={msg.code} language="typescript" />
-                    </div>
-                  ) : null}
+                      ) : msg.code ? (
+                        <CodeBlock code={msg.code} language="typescript" />
+                      ) : null}
+                    </>
+                  )}
+                </div>
+
+                {/* Toolbar Bubble & Info */}
+                <div className={`flex items-center mt-1 px-2 ${msg.role === 'user' ? 'flex-row-reverse justify-between' : 'justify-between'}`}>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    {msg.role === 'user' ? 'YOU' : 'AI ASSISTANT'}
+                  </span>
+
+                  {/* Tools */}
+                  <div className={`flex items-baseline gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${msg.role === 'assistant' ? 'ml-auto' : ''}`}>
+                    {msg.role === 'assistant' && msg.code && (
+                      <>
+                        <button onClick={() => navigator.clipboard.writeText(msg.code!)} className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-purple-600 uppercase transition-colors">
+                          <Copy size={14} /> Copy
+                        </button>
+                        <button onClick={() => handleDownload(msg.code!)} className="flex items-center gap-1.5 text-xs font-bold text-purple-600 hover:text-purple-800 uppercase transition-colors">
+                          <Download size={14} /> .spec.ts
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
+
+            </div>
           </div>
         ))}
 
         {isLoading && (
-          <div className="flex justify-start items-center gap-3 text-purple-600 font-bold text-xs animate-pulse">
+          <div className="flex items-center ml-14 gap-3 text-purple-600 font-bold text-xs animate-pulse">
             <Loader2 size={16} className="animate-spin" /> WRITING PLAYWRIGHT SCRIPT...
           </div>
         )}
