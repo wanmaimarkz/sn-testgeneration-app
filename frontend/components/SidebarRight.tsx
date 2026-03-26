@@ -142,13 +142,36 @@ function MoveToMenu({
   folders,
   currentFolderId,
   onMove,
+  anchorRef,
 }: {
   folders: FolderItem[];
   currentFolderId: number | null;
   onMove: (folderId: number | null) => void;
+  anchorRef: React.RefObject<HTMLButtonElement | null>;
 }) {
+  const [pos, setPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
+
+  useEffect(() => {
+    if (!anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    const menuWidth = 176; // w-44
+    // Check if opening to the right would overflow the viewport
+    const spaceRight = window.innerWidth - rect.right;
+    if (spaceRight < menuWidth) {
+      // Open to the left
+      setPos({ top: rect.top, right: window.innerWidth - rect.left + 4 });
+    } else {
+      setPos({ top: rect.top, left: rect.right + 4 });
+    }
+  }, [anchorRef]);
+
+  if (!pos) return null;
+
   return (
-    <div className="absolute left-full top-0 ml-1 w-44 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 py-2">
+    <div
+      style={{ position: 'fixed', top: pos.top, left: pos.left, right: pos.right, zIndex: 9999 }}
+      className="w-44 bg-white border border-gray-100 rounded-2xl shadow-2xl py-2"
+    >
       <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50 mb-1">
         Move to
       </div>
@@ -203,7 +226,35 @@ function ChatCard({
 }) {
   const [renaming, setRenaming] = useState(false);
   const [showMove, setShowMove] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const moveToRef = useRef<HTMLButtonElement>(null);
   const isOpen = openMenuId === chat.id;
+
+  const handleToggleMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (isOpen) {
+      setOpenMenuId(null);
+      setMenuPos(null);
+      setShowMove(false);
+      return;
+    }
+    const rect = menuBtnRef.current?.getBoundingClientRect();
+    if (rect) {
+      const menuWidth = 176; // w-44
+      const spaceRight = window.innerWidth - rect.left;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const menuHeight = 160; // approximate
+      const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4;
+      if (spaceRight < menuWidth) {
+        setMenuPos({ top, right: window.innerWidth - rect.right });
+      } else {
+        setMenuPos({ top, left: rect.left });
+      }
+    }
+    setOpenMenuId(chat.id);
+    setShowMove(false);
+  };
 
   return (
     <div className="relative group">
@@ -226,7 +277,7 @@ function ChatCard({
               onSelect?.(chat.id);
               window.dispatchEvent(new CustomEvent('chat:selected', { detail: { chatId: chat.id } }));
             }}
-            className="flex items-center gap-3 text-left w-full"
+            className="flex items-center gap-3 text-left w-full cursor-pointer"
           >
             <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-blue-50 shrink-0">
               <MessageCircle className="w-4 h-4 text-blue-500" />
@@ -241,8 +292,9 @@ function ChatCard({
         {!renaming && (
           <div className={`absolute top-2.5 right-2 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
             <button
+              ref={menuBtnRef}
               className="text-gray-400 hover:text-blue-500 p-1 rounded-lg hover:bg-blue-50"
-              onClick={e => { e.preventDefault(); setOpenMenuId(isOpen ? null : chat.id); setShowMove(false); }}
+              onClick={handleToggleMenu}
             >
               <EllipsisVertical width={16} />
             </button>
@@ -250,22 +302,26 @@ function ChatCard({
         )}
       </div>
 
-      {/* Dropdown */}
-      {isOpen && (
-        <div className="absolute right-2 top-11 w-44 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 py-1.5">
+      {/* Dropdown — fixed, floats above everything */}
+      {isOpen && menuPos && (
+        <div
+          style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, right: menuPos.right, zIndex: 9999 }}
+          className="w-44 bg-white border border-gray-100 rounded-2xl shadow-2xl py-1.5"
+        >
           <div className="px-4 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50 mb-1">
             Options
           </div>
 
           <button
             className="w-full text-left px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2.5"
-            onClick={() => { setRenaming(true); setOpenMenuId(null); }}
+            onClick={() => { setRenaming(true); setOpenMenuId(null); setMenuPos(null); }}
           >
             <Pencil className="w-3 h-3" /> Rename
           </button>
 
           <div className="relative">
             <button
+              ref={moveToRef}
               className="w-full text-left px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2.5"
               onClick={() => setShowMove(p => !p)}
             >
@@ -277,7 +333,8 @@ function ChatCard({
               <MoveToMenu
                 folders={folders}
                 currentFolderId={chat.folder_id}
-                onMove={folderId => { onMove(chat.id, folderId); setOpenMenuId(null); setShowMove(false); }}
+                anchorRef={moveToRef}
+                onMove={folderId => { onMove(chat.id, folderId); setOpenMenuId(null); setMenuPos(null); setShowMove(false); }}
               />
             )}
           </div>
@@ -285,7 +342,7 @@ function ChatCard({
           <div className="border-t border-gray-50 mt-1 pt-1">
             <button
               className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2.5"
-              onClick={() => { onDelete(chat.id); setOpenMenuId(null); }}
+              onClick={() => { onDelete(chat.id); setOpenMenuId(null); setMenuPos(null); }}
             >
               <Trash2 className="w-3 h-3" /> Delete
             </button>
@@ -319,12 +376,36 @@ function FolderSection({
   const [collapsed, setCollapsed] = useState(false);
   const [renamingFolder, setRenamingFolder] = useState(false);
   const [folderMenuOpen, setFolderMenuOpen] = useState(false);
+  const [folderMenuPos, setFolderMenuPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const folderMenuBtnRef = useRef<HTMLButtonElement>(null);
+
+  const handleFolderMenuToggle = () => {
+    if (folderMenuOpen) {
+      setFolderMenuOpen(false);
+      setFolderMenuPos(null);
+      return;
+    }
+    const rect = folderMenuBtnRef.current?.getBoundingClientRect();
+    if (rect) {
+      const menuWidth = 160; // w-40
+      const spaceRight = window.innerWidth - rect.left;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const menuHeight = 90;
+      const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4;
+      if (spaceRight < menuWidth) {
+        setFolderMenuPos({ top, right: window.innerWidth - rect.right });
+      } else {
+        setFolderMenuPos({ top, left: rect.left });
+      }
+    }
+    setFolderMenuOpen(true);
+  };
 
   return (
     <div className="mb-1">
       {/* Folder Header */}
       <div className="group flex items-center gap-1 px-1 py-1.5 rounded-lg hover:bg-gray-50">
-        <button className="flex items-center gap-1.5 flex-1 min-w-0" onClick={() => setCollapsed(p => !p)}>
+        <button className="flex items-center gap-1.5 flex-1 min-w-0 cursor-pointer" onClick={() => setCollapsed(p => !p)}>
           {collapsed
             ? <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
             : <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />}
@@ -345,22 +426,26 @@ function FolderSection({
         ) : (
           <div className="relative opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             <button
-              className="text-gray-400 hover:text-blue-500 p-0.5 rounded"
-              onClick={() => setFolderMenuOpen(p => !p)}
+              ref={folderMenuBtnRef}
+              className="text-gray-400 hover:text-blue-500 p-0.5 rounded cursor-pointer"
+              onClick={handleFolderMenuToggle}
             >
               <EllipsisVertical width={14} />
             </button>
-            {folderMenuOpen && (
-              <div className="absolute right-0 top-6 w-40 bg-white border border-gray-100 rounded-xl shadow-2xl z-50 py-1.5">
+            {folderMenuOpen && folderMenuPos && (
+              <div
+                style={{ position: 'fixed', top: folderMenuPos.top, left: folderMenuPos.left, right: folderMenuPos.right, zIndex: 9999 }}
+                className="w-40 bg-white border border-gray-100 rounded-xl shadow-2xl py-1.5"
+              >
                 <button
-                  className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2"
-                  onClick={() => { setRenamingFolder(true); setFolderMenuOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                  onClick={() => { setRenamingFolder(true); setFolderMenuOpen(false); setFolderMenuPos(null); }}
                 >
                   <Pencil className="w-3 h-3" /> Rename
                 </button>
                 <button
-                  className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
-                  onClick={() => { onDeleteFolder(folder.id); setFolderMenuOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+                  onClick={() => { onDeleteFolder(folder.id); setFolderMenuOpen(false); setFolderMenuPos(null); }}
                 >
                   <Trash2 className="w-3 h-3" /> Delete folder
                 </button>
@@ -404,8 +489,7 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);  const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -432,8 +516,6 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
     }
   }, [userId]);
 
-  // layout render SidebarRight เฉพาะ test-case / test-script อยู่แล้ว ไม่ต้องเช็ค path ซ้ำ
-  // pathname ใน deps → refetch ทุกครั้งที่ navigate ระหว่าง test-case ↔ test-script
   useEffect(() => {
     if (userId) fetchData();
   }, [userId, pathname, fetchData]);
@@ -451,20 +533,20 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
 
   // ── Chat Actions ────────────────────────────────────────────────────────────
   const handleDeleteChat = async (chatId: number) => {
-    setChats(prev => prev.filter(c => c.id !== chatId)); // optimistic
+    setChats(prev => prev.filter(c => c.id !== chatId));
     await api.deleteChat(chatId);
-    fetchData(); // sync กับ server
+    fetchData();
   };
 
   const handleRenameChat = async (chatId: number, name: string) => {
     if (!name) return;
-    setChats(prev => prev.map(c => c.id === chatId ? { ...c, name } : c)); // optimistic
+    setChats(prev => prev.map(c => c.id === chatId ? { ...c, name } : c));
     await api.renameChat(chatId, name);
     fetchData();
   };
 
   const handleMoveChat = async (chatId: number, folderId: number | null) => {
-    setChats(prev => prev.map(c => c.id === chatId ? { ...c, folder_id: folderId } : c)); // optimistic
+    setChats(prev => prev.map(c => c.id === chatId ? { ...c, folder_id: folderId } : c));
     await api.moveChat(chatId, folderId);
     fetchData();
   };
@@ -479,7 +561,7 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
       const res = await api.createFolder(name, userId);
       if ('detail' in res) throw new Error((res as any).detail);
       setCreatingFolder(false);
-      fetchData(); // sync จาก server
+      fetchData();
     } catch (err) {
       setFolderError(err instanceof Error ? err.message : 'Failed to create folder');
     }
@@ -499,20 +581,40 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
     fetchData();
   };
 
+  // ── Event Listeners ─────────────────────────────────────────────────────────
+
   // รับ event จาก page.tsx เมื่อสร้าง chat ใหม่
-  // ใช้งาน: window.dispatchEvent(new CustomEvent('chat:created'))
   useEffect(() => {
     const handler = () => fetchData();
     window.addEventListener('chat:created', handler);
     return () => window.removeEventListener('chat:created', handler);
   }, [fetchData]);
 
+  // restore selected chat เมื่อโหลดหน้าใหม่
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { chatId } = (e as CustomEvent).detail;
+      setSelectedChatId(chatId);
+    };
+    window.addEventListener('chat:restore', handler);
+    return () => window.removeEventListener('chat:restore', handler);
+  }, []);
+
+  // ล้าง Highlight เมื่อผู้ใช้กด New Chat (Test Case) จาก SidebarLeft
+  useEffect(() => {
+    const handleNewChat = () => {
+      setSelectedChatId(null);
+    };
+    window.addEventListener('chat:new', handleNewChat);
+    return () => window.removeEventListener('chat:new', handleNewChat);
+  }, []);
+
   const unassignedChats = (chats ?? []).filter(c => c.folder_id === null);
 
   return (
     <aside
       ref={sidebarRef}
-      className="w-64 bg-white border-l flex flex-col p-5 h-screen overflow-hidden shadow-2xl shrink-0"
+      className="w-64 bg-white border-l flex flex-col p-5 h-screen overflow-y-hidden shadow-2xl shrink-0"
     >
       <h2 className="text-xl font-bold text-gray-800 mb-6">Chat lists</h2>
 
@@ -531,7 +633,7 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
       ) : (
         <button
           onClick={() => setCreatingFolder(true)}
-          className="w-full border-2 border-dashed border-blue-400 rounded-xl py-4 px-3 mb-6 text-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-3 font-bold text-sm"
+          className="w-full border-2 border-dashed border-blue-400 rounded-xl py-4 px-3 mb-6 text-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-3 font-bold text-sm cursor-pointer"
         >
           <FolderPlus />
           New Folder
@@ -554,7 +656,7 @@ export default function SidebarRight({ userId }: SidebarRightProps) {
         {error && (
           <div className="text-center py-6 px-2">
             <p className="text-xs text-red-400 font-medium mb-2">{error}</p>
-            <button onClick={fetchData} className="text-xs text-blue-500 hover:underline">
+            <button onClick={fetchData} className="text-xs text-blue-500 hover:underline cursor-pointer">
               Retry
             </button>
           </div>
