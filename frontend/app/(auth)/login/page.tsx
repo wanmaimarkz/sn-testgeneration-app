@@ -75,14 +75,14 @@ export default function LoginPage() {
           transition: border-color 0.2s, box-shadow 0.2s;
         }
         .input-field:focus {
-          border-color: #3b82f6; /* เปลี่ยนเป็นสีฟ้า Blue-500 */
-          box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+          border-color: #6366f1; /* เปลี่ยนกลับเป็นสีม่วง Indigo-500 */
+          box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
         }
         .input-field::placeholder { color: #9ca3af; }
 
         .btn-primary {
           width: 100%;
-          background: #1d4ed8; /* เปลี่ยนเป็นสีฟ้า Blue-700 */
+          background: #1e1b4b; /* เปลี่ยนกลับเป็นสีม่วงเข้ม */
           color: #fff;
           padding: 0.875rem;
           border-radius: 12px;
@@ -92,11 +92,11 @@ export default function LoginPage() {
           transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
           display: flex; align-items: center; justify-content: center; gap: 0.5rem;
           cursor: pointer; border: none;
-          box-shadow: 0 4px 14px rgba(29,78,216,0.25);
+          box-shadow: 0 4px 14px rgba(30,27,75,0.25);
         }
         .btn-primary:hover:not(:disabled) {
-          background: #2563eb; /* Blue-600 */
-          box-shadow: 0 6px 20px rgba(29,78,216,0.35);
+          background: #312e81; /* Indigo-900 */
+          box-shadow: 0 6px 20px rgba(30,27,75,0.35);
         }
         .btn-primary:active:not(:disabled) { transform: scale(0.98); }
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -110,9 +110,9 @@ export default function LoginPage() {
 
         {/* Header */}
         <div className="mb-8">
-          <div className="inline-flex items-center gap-2 mb-5 px-3 py-1.5 rounded-full border border-blue-100 bg-blue-50">
-            <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-            <span className="text-xs font-semibold text-blue-600 tracking-wide uppercase heading-font">EZ TEST</span>
+          <div className="inline-flex items-center gap-2 mb-5 px-3 py-1.5 rounded-full border border-indigo-100 bg-indigo-50">
+            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+            <span className="text-xs font-semibold text-indigo-600 tracking-wide uppercase heading-font">EZ TEST</span>
           </div>
           <h2 className="text-4xl font-bold text-gray-900 mb-1.5 tracking-tight heading-font">
             Welcome back
@@ -150,7 +150,7 @@ export default function LoginPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-sm font-semibold text-gray-700">Password</label>
-              <Link href="/reset-password" className="text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors">
+              <Link href="/reset-password" className="text-xs text-indigo-500 hover:text-indigo-700 font-medium transition-colors">
                 Forgot password?
               </Link>
             </div>
@@ -167,7 +167,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 transition-colors p-0.5"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-500 transition-colors p-0.5"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -194,7 +194,7 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-gray-500 mt-5">
           Don&apos;t have an account?{' '}
-          <Link href="/register" className="text-blue-600 font-semibold hover:text-blue-800 transition-colors">
+          <Link href="/register" className="text-indigo-600 font-semibold hover:text-indigo-800 transition-colors">
             Create one
           </Link>
         </p>
