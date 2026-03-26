@@ -51,6 +51,8 @@ class Message(SQLModel, table=True):
     role: str  # "user" or "assistant"
     content: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    file_name: Optional[str] = Field(default=None)
+    file_size: Optional[int] = Field(default=None)
 
     # Foreign Key
     chat_id: int = Field(foreign_key="chat.id")
