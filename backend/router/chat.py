@@ -4,7 +4,7 @@ from pydantic import BaseModel, create_model
 from typing import List, Optional, Dict, Any
 from dependency import *
 import io
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 import pandas as pd
 import os
 import shutil
@@ -13,6 +13,9 @@ from uuid import uuid4
 from model import Chat, Message, Folder, User
 from sqlmodel import Session, select
 import requests
+
+UPLOAD_DIR = "./uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -26,6 +29,8 @@ class UserQuery(BaseModel):
     # chat_id: str
     columns: List[str]
     model: str = "local"
+    file_name: Optional[str] = None
+    file_size: Optional[int] = None
 
 
 class ScriptQuery(BaseModel):
@@ -43,6 +48,7 @@ class ChatMove(BaseModel):
 class ChatCreate(BaseModel):
     name: str
     user_id: int
+    chat_type: str = "test_case"  # "test_case" | "test_script"
 
 
 class ChatRename(BaseModel):
@@ -131,7 +137,7 @@ def health_check():
 @router.post("/", status_code=201)
 def create_new_chat(chat_data: ChatCreate, session: Session = Depends(get_db_session)):
     """Creates a fresh, empty chat session."""
-    new_chat = Chat(name=chat_data.name, user_id=chat_data.user_id)
+    new_chat = Chat(name=chat_data.name, user_id=chat_data.user_id, chat_type=chat_data.chat_type)
     session.add(new_chat)
     session.commit()
     session.refresh(new_chat)
@@ -163,7 +169,13 @@ def generate_test_case(
 
     user = session.get(User, chat.user_id)
 
-    user_msg = Message(chat_id=query.chat_id, role="user", content=query.text)
+    user_msg = Message(
+        chat_id=query.chat_id,
+        role="user",
+        content=query.text,
+        file_name=query.file_name,
+        file_size=query.file_size,
+    )
     session.add(user_msg)
     session.commit()
     print(query)
@@ -415,7 +427,7 @@ async def download_test_cases(query: DownloadQuery):
 
 @router.post("/upload")
 async def upload_document(
-    chat_id: str = Form(...),  # Client must send the chat_id along with the file
+    chat_id: str = Form(...),
     file: UploadFile = File(...),
     embed_model=Depends(get_embedding_model),
     collection=Depends(get_rag_collection),
@@ -423,14 +435,17 @@ async def upload_document(
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
-    # 1. Save file temporarily because pdfplumber needs a file path
-    temp_path = f"./temp_{uuid4()}_{file.filename}"
-    with open(temp_path, "wb") as buffer:
+    # 1. Save file permanently in ./uploads/{chat_id}/
+    chat_upload_dir = os.path.join(UPLOAD_DIR, str(chat_id))
+    os.makedirs(chat_upload_dir, exist_ok=True)
+    permanent_path = os.path.join(chat_upload_dir, file.filename)
+
+    with open(permanent_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
     try:
         # 2. Extract Use Cases
-        documents = extract_use_cases(temp_path)
+        documents = extract_use_cases(permanent_path)
         if not documents:
             raise HTTPException(status_code=400, detail="No extractable text found.")
 
@@ -439,7 +454,6 @@ async def upload_document(
             response = embed_model.create_embedding(doc)
             vector = response["data"][0]["embedding"]
 
-            # Store with chat_id in metadata
             collection.add(
                 documents=[doc],
                 embeddings=[vector],
@@ -447,7 +461,7 @@ async def upload_document(
                     {
                         "source": file.filename,
                         "type": "use_case_spec",
-                        "chat_id": chat_id,  # <--- CRITICAL: Isolates document to this chat
+                        "chat_id": chat_id,
                     }
                 ],
                 ids=[str(uuid4())],
@@ -459,10 +473,47 @@ async def upload_document(
             "chat_id": chat_id,
         }
 
-    finally:
-        # 4. Clean up the temporary file
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+    except HTTPException:
+        raise
+    except Exception as e:
+        if os.path.exists(permanent_path):
+            os.remove(permanent_path)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{chat_id}/files")
+def list_chat_files(chat_id: int, session: Session = Depends(get_db_session)):
+    """Lists uploaded PDF filenames for a given chat (from Message records)."""
+    statement = (
+        select(Message)
+        .where(Message.chat_id == chat_id, Message.file_name != None)
+        .order_by(Message.timestamp)
+    )
+    messages = session.exec(statement).all()
+    seen = set()
+    files = []
+    for msg in messages:
+        if msg.file_name and msg.file_name not in seen:
+            seen.add(msg.file_name)
+            files.append({
+                "file_name": msg.file_name,
+                "file_size": msg.file_size,
+            })
+    return files
+
+
+@router.get("/{chat_id}/file/{filename}")
+def download_chat_file(chat_id: int, filename: str):
+    """Downloads a previously uploaded PDF for a chat."""
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(UPLOAD_DIR, str(chat_id), safe_name)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(
+        path=file_path,
+        media_type="application/pdf",
+        filename=safe_name,
+    )
 
 
 @router.get("/{chat_id}/history")
@@ -531,7 +582,12 @@ def delete_chat(
     # This prevents orphaned vector data from taking up disk space
     collection.delete(where={"chat_id": str(chat_id)})
 
-    # 4. Delete Chat from SQLite
+    # 4. Delete uploaded files from disk
+    chat_upload_dir = os.path.join(UPLOAD_DIR, str(chat_id))
+    if os.path.exists(chat_upload_dir):
+        shutil.rmtree(chat_upload_dir)
+
+    # 5. Delete Chat from SQLite
     session.delete(chat)
     session.commit()
 

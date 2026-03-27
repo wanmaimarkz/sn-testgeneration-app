@@ -33,6 +33,7 @@ class Folder(SQLModel, table=True):
 class Chat(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(default="New Chat")
+    chat_type: str = Field(default="test_case")  # "test_case" | "test_script"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Foreign Keys
@@ -51,6 +52,8 @@ class Message(SQLModel, table=True):
     role: str  # "user" or "assistant"
     content: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    file_name: Optional[str] = Field(default=None)
+    file_size: Optional[int] = Field(default=None)
 
     # Foreign Key
     chat_id: int = Field(foreign_key="chat.id")
