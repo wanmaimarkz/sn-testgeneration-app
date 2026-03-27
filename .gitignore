@@ -91,3 +91,6 @@ eval
 
 # pdf
 *.pdf
+
+#files
+uploads/
