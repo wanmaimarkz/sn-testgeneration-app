@@ -92,5 +92,5 @@ eval
 # pdf
 *.pdf
 
-#files
-uploads/
+# dummy
+!README.md
