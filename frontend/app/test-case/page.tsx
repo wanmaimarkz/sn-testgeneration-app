@@ -630,7 +630,7 @@ export default function TestCasePage() {
           </div>
 
           <input value={input} onChange={(e) => setInput(e.target.value)} disabled={isLoading} className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-black font-medium transition-all" placeholder="Describe requirements..." />
-          <button disabled={isLoading || (!input.trim() && !selectedFile)} className="bg-blue-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-95 disabled:bg-gray-300">
+          <button disabled={isLoading || (!input.trim() && !selectedFile)} className="bg-blue-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-95 disabled:bg-gray-300 cursor-pointer">
             <Send size={20} />
           </button>
         </form>

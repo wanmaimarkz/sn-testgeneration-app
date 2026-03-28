@@ -85,3 +85,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Evaluation
+eval
+
+# pdf
+*.pdf
+
+# dummy
+!README.md
