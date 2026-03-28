@@ -19,7 +19,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
-HF_API_URL = "https://z7zxrhb7h2wgz7uj.us-east-1.aws.endpoints.huggingface.cloud"
+# HF_API_URL = "https://z7zxrhb7h2wgz7uj.us-east-1.aws.endpoints.huggingface.cloud"
 
 
 # --- SCHEMAS ---
@@ -213,10 +213,9 @@ def generate_test_case(
         if query.model == "cloud":
             # Check if user has saved a token
             if not user.hf_token:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Hugging Face token not found. Please add it in your Profile settings.",
-                )
+                raise HTTPException(status_code=400, detail="Hugging Face token not found.")
+            if not user.hf_endpoint_url:
+                raise HTTPException(status_code=400, detail="Hugging Face Endpoint URL not found. Please add it in Profile settings.")
 
             # Use the token from the database
             # --- CALL DEPLOYED MODEL ---
@@ -240,7 +239,7 @@ def generate_test_case(
                 }
             }
 
-            response = requests.post(HF_API_URL, headers=headers, json=payload)
+            response = requests.post(user.hf_endpoint_url, headers=headers, json=payload)
 
             if response.status_code != 200:
                 raise HTTPException(
@@ -322,10 +321,9 @@ def generate_test_script(
     try:
         if query.model == "cloud":
             if not user.hf_token:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Hugging Face token not found. Please add it in your Profile settings.",
-                )
+                raise HTTPException(status_code=400, detail="Hugging Face token not found.")
+            if not user.hf_endpoint_url:
+                raise HTTPException(status_code=400, detail="Hugging Face Endpoint URL not found. Please add it in Profile settings.")
 
             headers = {
                 "Authorization": f"Bearer {user.hf_token}",
@@ -344,7 +342,7 @@ def generate_test_script(
                 }
             }
 
-            response = requests.post(HF_API_URL, headers=headers, json=payload)
+            response = requests.post(user.hf_endpoint_url, headers=headers, json=payload)
 
             if response.status_code != 200:
                 raise HTTPException(

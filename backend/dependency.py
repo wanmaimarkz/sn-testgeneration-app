@@ -19,8 +19,8 @@ def get_test_case_llm():
     return test_case_llm
 
 def get_test_script_llm():
-    if test_script_llm is None:
-        raise RuntimeError("Test script LLM not loaded. Check lifespan events.")
+    # if test_script_llm is None:
+    #     raise RuntimeError("Test script LLM not loaded. Check lifespan events.")
     return test_script_llm
 
 def get_embedding_model():

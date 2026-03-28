@@ -9,6 +9,7 @@ class User(SQLModel, table=True):
     username: str = Field(index=True, unique=True)
     hashed_password: str
     hf_token: Optional[str] = Field(default=None)
+    hf_endpoint_url: Optional[str] = Field(default=None)
 
     # Relationships: A user has many folders and many chats
     folders: List["Folder"] = Relationship(back_populates="user")

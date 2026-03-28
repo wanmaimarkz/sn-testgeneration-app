@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from pydantic import BaseModel
@@ -22,6 +23,7 @@ class PasswordUpdate(BaseModel):
 class HFTokenUpdate(BaseModel):
     user_id: int
     hf_token: str
+    hf_endpoint_url: Optional[str] = None
 
 
 # --- ENDPOINTS ---
@@ -72,14 +74,40 @@ def change_password(data: PasswordUpdate, session: Session = Depends(get_db_sess
 
     return {"message": "Password updated successfully"}
 
+
 @router.patch("/hf-token")
 def update_hf_token(data: HFTokenUpdate, session: Session = Depends(get_db_session)):
     user = session.get(User, data.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-
     user.hf_token = data.hf_token
+    if data.hf_endpoint_url:
+        user.hf_endpoint_url = data.hf_endpoint_url
     session.add(user)
     session.commit()
+    return {"message": "Hugging Face settings saved successfully"}
+
+
+@router.delete("/hf-token")
+def remove_hf_token(user_id: int, session: Session = Depends(get_db_session)):
+    """Remove only the HuggingFace API token from the user account."""
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     
-    return {"message": "Hugging Face token saved successfully"}
+    user.hf_token = None
+    session.add(user)
+    session.commit()
+    return {"message": "HuggingFace token removed successfully"}
+
+
+@router.delete("/hf-endpoint")
+def remove_hf_endpoint(user_id: int, session: Session = Depends(get_db_session)):
+    """Remove only the HuggingFace Inference Endpoint URL from the user account."""
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.hf_endpoint_url = None
+    session.add(user)
+    session.commit()
+    return {"message": "HuggingFace endpoint URL removed successfully"}
