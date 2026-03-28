@@ -42,13 +42,18 @@ export default function TestCasePage() {
     }
   }, []);
 
-  const [noHfKeyWarning, setNoHfKeyWarning] = useState(false);
+  const [noCloudConfigWarning, setNoCloudConfigWarning] = useState(false);
   const [hasHfKey, setHasHfKey] = useState(false);
+  const [hasHfEndpoint, setHasHfEndpoint] = useState(false);
   
   useEffect(() => {
     const key = localStorage.getItem('hf_key');
+    const endpoint = localStorage.getItem('hf_endpoint_url');
+    
     setHasHfKey(!!key && key.startsWith('hf_'));
+    setHasHfEndpoint(!!endpoint && endpoint.trim().length > 0);
   }, []);
+
 
   const [messages, setMessages] = useState<{
     id: string,
@@ -57,7 +62,7 @@ export default function TestCasePage() {
     rawData?: any,
     columns?: string[],
     attachedFile?: { name: string, size: number },
-    fileChatId?: number, // ใช้ undefined แทน null เพื่อป้องกัน TS Error
+    fileChatId?: number,
   }[]>([]);
 
   const [input, setInput] = useState("");
@@ -169,7 +174,6 @@ export default function TestCasePage() {
   const scrollToBottom = () => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
 
-  // Click Outside Handler สำหรับทั้ง Model Picker และ Column Dropdown
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (modelPickerRef.current && !modelPickerRef.current.contains(e.target as Node)) {
@@ -190,7 +194,6 @@ export default function TestCasePage() {
     setTimeout(() => setShowCopyToast(false), 2000);
   };
 
-  // เปิดไฟล์โดยตรง ไม่ต้องยิงเช็ค HEAD ป้องกันปัญหา CORS
   const handleOpenFile = (fileChatId: number | null | undefined, fileName: string) => {
     const id = fileChatId ?? chatId;
     if (!id) {
@@ -289,7 +292,6 @@ export default function TestCasePage() {
     const currentFile = selectedFile;
     const fileToAttach = currentFile ? { name: currentFile.name, size: currentFile.size } : undefined;
     
-    // สร้าง ID ชั่วคราวสำหรับการแสดงผล
     const tempMessageId = Date.now().toString();
 
     setMessages(prev => [...prev, {
@@ -306,7 +308,6 @@ export default function TestCasePage() {
     try {
       let activeChatId = chatId;
 
-      // 1. ตรวจสอบแชท หากไม่มีสร้างใหม่ก่อน
       if (!activeChatId) {
         const chatRes = await fetch('http://127.0.0.1:8000/api/chat/', {
           method: 'POST',
@@ -321,13 +322,11 @@ export default function TestCasePage() {
         activeChatId = newChat.id;
         setChatId(activeChatId);
 
-        // ใส่ ?? undefined เพื่อแก้ปัญหา TS Error fileChatId: number | undefined
         setMessages(prev => prev.map(msg => msg.id === tempMessageId ? { ...msg, fileChatId: activeChatId ?? undefined } : msg));
       } else {
         setMessages(prev => prev.map(msg => msg.id === tempMessageId ? { ...msg, fileChatId: activeChatId ?? undefined } : msg));
       }
 
-      // 2. Upload ไฟล์
       if (currentFile && activeChatId) {
         const formData = new FormData();
         formData.append('file', currentFile);
@@ -339,7 +338,6 @@ export default function TestCasePage() {
         if (!uploadRes.ok) throw new Error("File upload failed");
       }
 
-      // 3. Generate Test Case
       const response = await fetch('http://127.0.0.1:8000/api/chat/test-case', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -373,7 +371,6 @@ export default function TestCasePage() {
   return (
     <div className="relative bg-slate-50 rounded-2xl shadow-xl flex-1 flex flex-col overflow-hidden h-full border border-gray-100">
 
-      {/* Toast Notification */}
       {showCopyToast && (
         <div className="absolute top-10 left-1/2 -translate-x-1/2 z-60 bg-emerald-500 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 font-bold animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 size={18} /> Copied!
@@ -385,7 +382,6 @@ export default function TestCasePage() {
         </div>
       )}
 
-      {/* Header */}
       <div className="p-6 border-b flex justify-between items-center bg-white">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><FileText size={24} /></div>
@@ -395,7 +391,6 @@ export default function TestCasePage() {
           </div>
         </div>
 
-        {/* Model Picker Button */}
         <div className="relative" ref={modelPickerRef}>
           <button
             type="button"
@@ -413,23 +408,25 @@ export default function TestCasePage() {
                 Select Model
               </p>
 
-              {noHfKeyWarning && (
+              {/* --- เริ่มต้นส่วนที่แก้ไข: อัปเดตข้อความแจ้งเตือน --- */}
+              {noCloudConfigWarning && (
                 <div className="mx-2 mb-2 px-3 py-2.5 bg-red-500/20 border border-red-500/40 rounded-xl flex items-center gap-2 animate-in fade-in">
                   <AlertCircle size={14} className="text-red-400 shrink-0" />
-                  <span className="text-red-400 text-xs font-bold">⚠️ HuggingFace API Key required — please add it in Profile Settings</span>
+                  <span className="text-red-400 text-xs font-bold">⚠️ HF Key & Endpoint required — please set them in Profile</span>
                 </div>
               )}
 
               {MODELS.map(model => {
-                const isDisabled = model.id === 'cloud' && !hasHfKey;
+                // อัปเดตเงื่อนไขให้ต้องมีทั้งสองค่าเมื่อเลือก Cloud
+                const isDisabled = model.id === 'cloud' && (!hasHfKey || !hasHfEndpoint);
                 return (
                   <button
                     key={model.id}
                     type="button"
                     onClick={() => {
                       if (isDisabled) {
-                        setNoHfKeyWarning(true);
-                        setTimeout(() => setNoHfKeyWarning(false), 3500);
+                        setNoCloudConfigWarning(true);
+                        setTimeout(() => setNoCloudConfigWarning(false), 3500);
                         return;
                       }
                       setSelectedModel(model.id);
@@ -451,13 +448,13 @@ export default function TestCasePage() {
                           </span>
                           {isDisabled && (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-900/50 text-red-400">
-                              No Key
+                              Missing Config
                             </span>
                           )}
                         </div>
                         <p className="text-gray-400 text-xs leading-snug">{model.desc}</p>
                         {isDisabled && (
-                          <p className="text-red-400 text-[10px] mt-0.5">HF Key required. Please configure it in your Profile.</p>
+                          <p className="text-red-400 text-[10px] mt-0.5">HF Key & Endpoint required. Please configure in Profile.</p>
                         )}
                       </div>
                     </div>
@@ -469,6 +466,7 @@ export default function TestCasePage() {
                   </button>
                 );
               })}
+              {/* --- สิ้นสุดส่วนที่แก้ไข --- */}
               <div className="px-4 py-3 border-t border-gray-700 mt-1">
                 <p className="text-[10px] text-gray-500 leading-relaxed">
                   {selectedModel === 'local'
@@ -481,7 +479,6 @@ export default function TestCasePage() {
         </div>
       </div>
 
-      {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-50/50 custom-scrollbar">
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4 opacity-40">
@@ -491,7 +488,6 @@ export default function TestCasePage() {
         )}
         
         {(() => {
-          // คำนวณหา index ของข้อความ user ล่าสุดเพื่อแสดงปุ่ม Edit
           const lastUserIndex = messages.reduce((acc, m, i) => m.role === 'user' ? i : acc, -1);
           
           return messages.map((msg, index) => (
@@ -504,7 +500,6 @@ export default function TestCasePage() {
                 <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
                   <div className={`relative rounded-2xl p-4 shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'}`}>
                     
-                    {/* File Attachment แสดง Size ตาม Version เก่า */}
                     {msg.role === 'user' && msg.attachedFile && (
                       <button
                         type="button"
@@ -537,13 +532,11 @@ export default function TestCasePage() {
                     )}
                   </div>
 
-                  {/* Toolbar & Info Section ตาม Version เก่าเป๊ะๆ */}
                   <div className={`flex items-center mt-1 px-2 ${msg.role === 'user' ? 'flex-row-reverse justify-between' : 'justify-between'}`}>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                       {msg.role === 'user' ? 'YOU' : 'AI ASSISTANT'}
                     </span>
 
-                    {/* User Tools (Copy & Edit) */}
                     {msg.role === 'user' && (
                       <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <button onClick={() => handleCopy(msg.content)} className="text-gray-400 hover:text-blue-600"><Copy size={14} /></button>
@@ -553,7 +546,6 @@ export default function TestCasePage() {
                       </div>
                     )}
 
-                    {/* Assistant Tools (Copy JSON, CSV, Generate Script) */}
                     {msg.role === 'assistant' && (
                       <div className="flex items-baseline gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ml-auto">
                         <div className="flex items-center gap-3 pr-4 mr-1">
@@ -594,7 +586,6 @@ export default function TestCasePage() {
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input Section */}
       <div className="p-4 bg-white border-t space-y-3 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
         {selectedFile && (
           <div className="flex items-center justify-between bg-blue-50 border border-blue-100 p-2 px-4 rounded-xl animate-in slide-in-from-bottom-2">

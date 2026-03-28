@@ -29,21 +29,16 @@ export default function SidebarLeft() {
     { name: 'Profile', icon: UserCircle, path: '/profile' },
   ];
 
-  // ✅ แก้ไขฟังก์ชัน handleLogout ตรงนี้
   const handleLogout = () => {
-    // 1. เคลียร์ข้อมูล User
     localStorage.removeItem('user');
     localStorage.removeItem('hf_key');
-    
-    // 2. เคลียร์ Cache การจำแชทเก่าๆ ทิ้งให้หมด
+    localStorage.removeItem('hf_endpoint_url');
     localStorage.removeItem('last_testcase_chat_id');
     localStorage.removeItem('preferred_model');
-    sessionStorage.clear(); // ล้าง session เผื่อมีค้าง
-    
-    // 3. เคลียร์ Cookie
+    sessionStorage.clear();
+
     document.cookie = "isLoggedIn=; path=/; max-age=0";
-    
-    // 4. ใช้ window.location.href แทน router.push เพื่อบังคับล้าง State ทั้งหมดของ React
+
     window.location.href = '/login';
   };
 

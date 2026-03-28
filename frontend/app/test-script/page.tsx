@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import {
   Terminal, Loader2, Copy, Download, Trash2,
   Code2, ChevronDown, AlertCircle, Cpu, Cloud, Check, ChevronUp,
-  User, Bot // เพิ่ม Import User และ Bot
+  User, Bot
 } from 'lucide-react';
 import { CodeBlock } from '@/components/testscript/CodeBlock';
 
@@ -38,8 +38,12 @@ type Message = {
 export default function TestScriptPage() {
   const [selectedModel, setSelectedModel] = useState<ModelType>('local');
   const [showModelPicker, setShowModelPicker] = useState(false);
-  const [noHfKeyWarning, setNoHfKeyWarning] = useState(false);
+  
+  // --- เริ่มต้นส่วนที่แก้ไข: ใช้แค่ noCloudConfigWarning ---
+  const [noCloudConfigWarning, setNoCloudConfigWarning] = useState(false);
   const [hasHfKey, setHasHfKey] = useState(false);
+  const [hasHfEndpoint, setHasHfEndpoint] = useState(false);
+  // --- สิ้นสุดส่วนที่แก้ไข ---
 
   const [jsonInput, setJsonInput] = useState('');
   const [jsonError, setJsonError] = useState<string | null>(null);
@@ -62,10 +66,10 @@ export default function TestScriptPage() {
   // Check for HF Key and User Info
   useEffect(() => {
     const key = localStorage.getItem('hf_key');
+    const endpoint = localStorage.getItem('hf_endpoint_url');
+    
     setHasHfKey(!!key && key.startsWith('hf_'));
-
-    const userData = localStorage.getItem('user');
-    if (userData) setUserId(JSON.parse(userData).id);
+    setHasHfEndpoint(!!endpoint && endpoint.trim().length > 0);
   }, []);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -296,23 +300,24 @@ export default function TestScriptPage() {
                 Select Model
               </p>
 
-              {noHfKeyWarning && (
+              {/* --- เริ่มต้นส่วนที่แก้ไข: อัปเดตข้อความแจ้งเตือน --- */}
+              {noCloudConfigWarning && (
                 <div className="mx-2 mb-2 px-3 py-2.5 bg-red-500/20 border border-red-500/40 rounded-xl flex items-center gap-2 animate-in fade-in">
                   <AlertCircle size={14} className="text-red-400 shrink-0" />
-                  <span className="text-red-400 text-xs font-bold">⚠️ HF Key required. Please check Profile Settings.</span>
+                  <span className="text-red-400 text-xs font-bold">⚠️ HF Key & Endpoint required — please set them in Profile</span>
                 </div>
               )}
 
               {MODELS.map(model => {
-                const isDisabled = model.id === 'cloud' && !hasHfKey;
+                const isDisabled = model.id === 'cloud' && (!hasHfKey || !hasHfEndpoint);
                 return (
                   <button
                     key={model.id}
                     type="button"
                     onClick={() => {
                       if (isDisabled) {
-                        setNoHfKeyWarning(true);
-                        setTimeout(() => setNoHfKeyWarning(false), 3500);
+                        setNoCloudConfigWarning(true);
+                        setTimeout(() => setNoCloudConfigWarning(false), 3500);
                         return;
                       }
                       setSelectedModel(model.id);
@@ -332,11 +337,20 @@ export default function TestScriptPage() {
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${model.badgeColor}`}>
                             {model.badge}
                           </span>
+                          {/* --- เริ่มต้นส่วนที่แก้ไข: เพิ่ม Badge Missing Config --- */}
+                          {isDisabled && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-900/50 text-red-400">
+                              Missing Config
+                            </span>
+                          )}
+                          {/* --- สิ้นสุดส่วนที่แก้ไข --- */}
                         </div>
                         <p className="text-gray-400 text-xs leading-snug">{model.desc}</p>
+                        {/* --- เริ่มต้นส่วนที่แก้ไข: อัปเดตข้อความอธิบาย --- */}
                         {isDisabled && (
-                          <p className="text-red-400 text-[10px] mt-0.5 font-bold">HF Key required in Profile.</p>
+                          <p className="text-red-400 text-[10px] mt-0.5">HF Key & Endpoint required. Please configure in Profile.</p>
                         )}
+                        {/* --- สิ้นสุดส่วนที่แก้ไข --- */}
                       </div>
                     </div>
                     {selectedModel === model.id && !isDisabled && (
