@@ -55,5 +55,6 @@ def login(user_data: UserAuth, session: Session = Depends(get_db_session)):
         "message": "Login successful",
         "user_id": user.id,
         "username": user.username,
-        "hf_token": user.hf_token
+        "hf_token": user.hf_token,
+        "hf_endpoint_url": user.hf_endpoint_url,
     }

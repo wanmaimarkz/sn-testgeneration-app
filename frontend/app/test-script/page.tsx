@@ -63,13 +63,19 @@ export default function TestScriptPage() {
       }
     }, []);
 
-  // Check for HF Key and User Info
+  // Check for HF Key, Endpoint and load userId
   useEffect(() => {
     const key = localStorage.getItem('hf_key');
     const endpoint = localStorage.getItem('hf_endpoint_url');
-    
+
     setHasHfKey(!!key && key.startsWith('hf_'));
     setHasHfEndpoint(!!endpoint && endpoint.trim().length > 0);
+
+    // userId is stored inside the 'user' object set at login
+    try {
+      const userObj = JSON.parse(localStorage.getItem('user') ?? 'null');
+      if (userObj?.id) setUserId(Number(userObj.id));
+    } catch { /* malformed — ignore */ }
   }, []);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -196,6 +202,9 @@ export default function TestScriptPage() {
 
     try {
       let activeChatId = chatId;
+      if (!activeChatId && !activeUserId) {
+        throw new Error('User session not found. Please log out and log in again.');
+      }
       if (!activeChatId && activeUserId) {
         const chatRes = await fetch('http://127.0.0.1:8000/api/chat/', {
           method: 'POST',
@@ -210,11 +219,19 @@ export default function TestScriptPage() {
       const response = await fetch('http://127.0.0.1:8000/api/chat/test-script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ test_cases: cases, chat_id: activeChatId, model: activeModel }),
+        body: JSON.stringify({ cases: cases, chat_id: activeChatId, model: activeModel }),
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || 'Generation failed');
+      if (!response.ok) {
+        const detail = data.detail;
+        const msg = typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ')
+            : 'Generation failed';
+        throw new Error(msg);
+      }
 
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', code: data.code }]);
       setJsonInput('');
