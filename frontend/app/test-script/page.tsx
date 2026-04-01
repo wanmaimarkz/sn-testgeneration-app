@@ -415,8 +415,8 @@ export default function TestScriptPage() {
                   {msg.role === 'user' && msg.jsonInput && (
                     <>
                       <p className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-70">Test Case JSON</p>
-                      <pre className="text-xs font-mono overflow-x-auto max-h-32 whitespace-pre leading-relaxed opacity-90">
-                        {prettyJson(msg.jsonInput).slice(0, 400)}{prettyJson(msg.jsonInput).length > 400 ? '\n...' : ''}
+                      <pre className="text-xs font-mono overflow-x-auto max-h-72 whitespace-pre leading-relaxed opacity-90 overflow-y-auto scrollbar-thin" style={{scrollbarColor: "rgba(255,255,255,0.75) transparent"}}>
+                        {prettyJson(msg.jsonInput)}
                       </pre>
                     </>
                   )}
