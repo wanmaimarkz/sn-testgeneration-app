@@ -258,12 +258,14 @@ function ChatCard({
 
   return (
     <div className="relative group">
-      <div className={`flex flex-col p-2 rounded-xl border transition-all bg-white shadow-sm
+      <div className={`flex flex-col p-2 rounded-xl border transition-all shadow-sm
         ${isSelected
-          ? 'border-blue-400 bg-blue-50 shadow-md'
+          ? chat.chat_type === 'test_script'
+            ? 'border-purple-500 bg-purple-600 shadow-md'
+            : 'border-blue-500 bg-blue-600 shadow-md'
           : isOpen
-            ? 'border-blue-200 shadow-md'
-            : 'border-gray-100 hover:border-blue-200 hover:shadow-md'}`}>
+            ? 'bg-white border-blue-200 shadow-md'
+            : 'bg-white border-gray-100 hover:border-blue-200 hover:shadow-md'}`}>
 
         {renaming ? (
           <InlineRename
@@ -285,26 +287,28 @@ function ChatCard({
             className="flex items-center gap-3 text-left w-full cursor-pointer"
           >
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-              chat.chat_type === 'test_script' ? 'bg-purple-50' : 'bg-blue-50'
+              isSelected ? 'bg-white/20' : chat.chat_type === 'test_script' ? 'bg-purple-50' : 'bg-blue-50'
             }`}>
               {chat.chat_type === 'test_script'
-                ? <Terminal className="w-4 h-4 text-purple-500" />
-                : <FileText className="w-4 h-4 text-blue-500" />
+                ? <Terminal className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-purple-500'}`} />
+                : <FileText className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-blue-500'}`} />
               }
             </div>
             <div className="truncate flex-1 min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <p className={`text-sm font-semibold truncate ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>{chat.name}</p>
+                <p className={`text-sm font-semibold truncate ${isSelected ? 'text-white' : 'text-gray-700'}`}>{chat.name}</p>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
-                  chat.chat_type === 'test_script'
-                    ? 'bg-purple-100 text-purple-600'
-                    : 'bg-blue-100 text-blue-600'
+                  isSelected
+                    ? 'bg-white/20 text-white'
+                    : chat.chat_type === 'test_script'
+                      ? 'bg-purple-100 text-purple-600'
+                      : 'bg-blue-100 text-blue-600'
                 }`}>
                   {chat.chat_type === 'test_script' ? 'Script' : 'Case'}
                 </span>
-                <p className="text-[10px] text-gray-400 font-medium">{formatDate(chat.created_at)}</p>
+                <p className={`text-[10px] font-medium ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>{formatDate(chat.created_at)}</p>
               </div>
             </div>
           </button>
@@ -530,6 +534,10 @@ export default function SidebarRight({ userId: propUserId }: SidebarRightProps) 
         console.error("Failed to parse user data", e);
       }
     }
+    // Restore active chat from URL param on mount (in case chat:restore event was missed)
+    const params = new URLSearchParams(window.location.search);
+    const chatIdParam = params.get('chatId');
+    if (chatIdParam) setSelectedChatId(Number(chatIdParam));
   }, []);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
