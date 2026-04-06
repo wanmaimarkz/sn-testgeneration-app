@@ -8,18 +8,22 @@ export default function SidebarLeft() {
   const router = useRouter();
   const [username, setUsername] = useState('');
 
-  useEffect(() => {
+  const loadUsername = () => {
     const storedUserStr = localStorage.getItem('user');
     if (storedUserStr) {
       try {
         const userData = JSON.parse(storedUserStr);
-        if (userData.username) {
-          setUsername(userData.username);
-        }
+        if (userData.username) setUsername(userData.username);
       } catch (e) {
         console.error("Failed to parse user data", e);
       }
     }
+  };
+
+  useEffect(() => {
+    loadUsername();
+    window.addEventListener('user:updated', loadUsername);
+    return () => window.removeEventListener('user:updated', loadUsername);
   }, []);
 
   const menuItems = [

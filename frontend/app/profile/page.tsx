@@ -123,6 +123,7 @@ export default function ProfilePage() {
         const userData = JSON.parse(storedUserStr);
         userData.username = data.new_username;
         localStorage.setItem('user', JSON.stringify(userData));
+        window.dispatchEvent(new CustomEvent('user:updated'));
       }
       setInitialUsername(data.new_username);
       setUsername(data.new_username);
